@@ -1,0 +1,10 @@
+{
+  "name": "Remix: ClassGuard AI Attendance - Python",
+  "description": "Smart classroom attendance tracker converted to Python/Streamlit.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "C7": [],
+  "aq": []
+}
