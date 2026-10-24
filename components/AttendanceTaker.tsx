@@ -33,7 +33,15 @@ import {
   AttendanceStatus,
   DailyRecord,
   Holiday,
+  StaffMember,
+  StaffAttendanceData,
 } from '../types';
+import {
+  getStaffList,
+  getStaffAttendance,
+  saveStaffAttendance,
+  appendAuditLog,
+} from '../services/schoolStoreService';
 import { analyzeClassroomImage } from '../services/geminiService';
 import {
   GsmGatewayConfig,
@@ -56,6 +64,8 @@ interface Props {
   attendanceData: AttendanceData;
   setAttendanceData: React.Dispatch<React.SetStateAction<AttendanceData>>;
   holidays: Holiday[];
+  actorName?: string;
+  actorRole?: 'ADMIN' | 'TEACHER' | 'STAFF';
 }
 
 interface RfidTapDisplay {
@@ -104,10 +114,20 @@ const AttendanceTaker: React.FC<Props> = ({
   attendanceData,
   setAttendanceData,
   holidays,
+  actorName = 'Ustad Ahmed Raza',
+  actorRole = 'TEACHER',
 }) => {
+  // Target Audience: Students OR Teachers/Staff
+  const [attendanceTarget, setAttendanceTarget] = useState<'STUDENTS' | 'STAFF'>('STUDENTS');
+  const [staffList] = useState<StaffMember[]>(() => getStaffList());
+  const [staffAttendance, setStaffAttendance] = useState<StaffAttendanceData>(() =>
+    getStaffAttendance()
+  );
+  const [showOptionalManual, setShowOptionalManual] = useState<boolean>(false);
+
   // Top-level Attendance Mode:
-  // 1) 'rfid_gate' -> Live USB RFID Card Gate Terminal (1st Tap = IN, 2nd Tap = OUT, Blinking Cursor)
-  // 2) 'ai_photo'  -> AI Classroom Group Photo Attendance (Present / Absent)
+  // 1) 'rfid_gate' -> Main Subsystem 1: Live USB RFID Card Gate Terminal (1st Tap = IN, 2nd Tap = OUT)
+  // 2) 'ai_photo'  -> Main Subsystem 2: AI Photo-Scan Attendance (Students or Staff Group Photo)
   // 3) 'messaging' -> GSM Mobile SIM Virtual Server + WhatsApp Web + Backend Email Hub
   const [activeMode, setActiveMode] = useState<'rfid_gate' | 'ai_photo' | 'messaging'>(
     'rfid_gate'
@@ -167,10 +187,25 @@ const AttendanceTaker: React.FC<Props> = ({
   );
 
   const targetStudents = useMemo(() => {
+    if (attendanceTarget === 'STAFF') {
+      return staffList.map((stf) => ({
+        id: stf.id,
+        grNo: stf.empId,
+        name: stf.name,
+        fatherName: `${stf.designation} (${stf.department})`,
+        grade: stf.role,
+        section: 'Staff',
+        rollNo: stf.empId,
+        parentPhone: stf.phone,
+        parentEmail: stf.email,
+        photoUrl: stf.photoUrl,
+        rfidCardNo: stf.rfidCardNo,
+      })) as Student[];
+    }
     return selectedClass === 'All'
       ? students
       : students.filter((s) => s.grade === selectedClass);
-  }, [students, selectedClass]);
+  }, [students, selectedClass, attendanceTarget, staffList]);
 
   const dateInfo = useMemo(() => {
     const d = new Date(selectedDate);
@@ -255,12 +290,14 @@ const AttendanceTaker: React.FC<Props> = ({
     }
   };
 
+  const activeStore = attendanceTarget === 'STAFF' ? staffAttendance : attendanceData;
+
   /**
    * Core handler when the USB RFID Reader types a Card Serial Number and presses Enter
    */
   const handleRfidCardTap = async (rawSerialInput: string) => {
     const cleanSerial = rawSerialInput.trim();
-    // Always clear the input immediately and keep cursor blinking for the next student
+    // Always clear the input immediately and keep cursor blinking for the next person
     setRfidInput('');
     setTimeout(() => {
       rfidInputRef.current?.focus();
@@ -268,9 +305,10 @@ const AttendanceTaker: React.FC<Props> = ({
 
     if (!cleanSerial) return;
 
-    // Match student by rfidCardNo, grNo, or id (also stripping leading zeros for flexible Chinese 10-digit readers)
+    // Match person (Student or Teacher/Staff) by rfidCardNo, grNo/empId, or id
     const strippedSerial = cleanSerial.replace(/^0+/, '');
-    const matchedStudent = students.find((s) => {
+    const pool = attendanceTarget === 'STAFF' ? targetStudents : students;
+    const matchedStudent = pool.find((s) => {
       const card = (s.rfidCardNo || '').trim();
       const strippedCard = card.replace(/^0+/, '');
       return (
@@ -285,8 +323,8 @@ const AttendanceTaker: React.FC<Props> = ({
     if (!matchedStudent) {
       playGateBeep('ERROR');
       setUnknownCardSerial(cleanSerial);
-      if (students.length > 0 && !assignStudentId) {
-        setAssignStudentId(students[0].id);
+      if (pool.length > 0 && !assignStudentId) {
+        setAssignStudentId(pool[0].id);
       }
       return;
     }
@@ -299,7 +337,7 @@ const AttendanceTaker: React.FC<Props> = ({
       second: '2-digit',
     });
 
-    const existingToday = attendanceData[matchedStudent.id]?.[selectedDate];
+    const existingToday = activeStore[matchedStudent.id]?.[selectedDate];
 
     // 1st Tap = IN (Check-in), 2nd Tap = OUT (Check-out)
     let nextGateAction: 'IN' | 'OUT' = 'IN';
@@ -311,12 +349,10 @@ const AttendanceTaker: React.FC<Props> = ({
       existingToday.status === AttendanceStatus.PRESENT &&
       existingToday.attendanceState === 'IN'
     ) {
-      // Student is already IN -> This 2nd tap marks them OUT!
       nextGateAction = 'OUT';
       checkInTime = existingToday.checkInTime || nowTime;
       checkOutTime = nowTime;
     } else if (existingToday && existingToday.attendanceState === 'OUT') {
-      // If tapped again after OUT, toggle back to IN (re-entry) or update
       nextGateAction = 'IN';
       checkInTime = nowTime;
       checkOutTime = undefined;
@@ -333,13 +369,35 @@ const AttendanceTaker: React.FC<Props> = ({
       smsNotified: gsmConfig.autoSendOnRfid,
     };
 
-    setAttendanceData((prev) => ({
-      ...prev,
-      [matchedStudent.id]: {
-        ...(prev[matchedStudent.id] || {}),
-        [selectedDate]: updatedRecord,
-      },
-    }));
+    if (attendanceTarget === 'STAFF') {
+      setStaffAttendance((prev) => {
+        const next = {
+          ...prev,
+          [matchedStudent.id]: {
+            ...(prev[matchedStudent.id] || {}),
+            [selectedDate]: updatedRecord,
+          },
+        };
+        saveStaffAttendance(next);
+        return next;
+      });
+    } else {
+      setAttendanceData((prev) => ({
+        ...prev,
+        [matchedStudent.id]: {
+          ...(prev[matchedStudent.id] || {}),
+          [selectedDate]: updatedRecord,
+        },
+      }));
+    }
+
+    appendAuditLog({
+      actorName,
+      actorRole,
+      actionType: 'ATTENDANCE_RFID',
+      targetSummary: `${attendanceTarget === 'STAFF' ? 'Staff' : 'Student'} ${matchedStudent.name} (${matchedStudent.grNo})`,
+      details: `RFID Card Tap (${matchedStudent.rfidCardNo || cleanSerial}) marked ${nextGateAction} at ${nowTime} on ${selectedDate}.`,
+    });
 
     playGateBeep(nextGateAction);
     announceGateEvent(matchedStudent.name, nextGateAction);
@@ -371,8 +429,8 @@ const AttendanceTaker: React.FC<Props> = ({
     // Automatically dispatch GSM SIM SMS & Backend Email if enabled
     if (gsmConfig.enabled && gsmConfig.autoSendOnRfid && matchedStudent.parentPhone) {
       const log = await sendGsmSms({
-        recipientName: `${matchedStudent.fatherName} (F/O ${matchedStudent.name})`,
-        recipientRole: 'Parent',
+        recipientName: `${matchedStudent.fatherName} (${matchedStudent.name})`,
+        recipientRole: attendanceTarget === 'STAFF' ? 'Teacher' : 'Parent',
         phone: matchedStudent.parentPhone,
         messageText: smsText,
         eventType,
@@ -382,7 +440,7 @@ const AttendanceTaker: React.FC<Props> = ({
       if (gsmConfig.emailEnabled && matchedStudent.parentEmail) {
         await sendBackendEmail({
           recipientName: matchedStudent.fatherName,
-          recipientRole: 'Parent',
+          recipientRole: attendanceTarget === 'STAFF' ? 'Teacher' : 'Parent',
           email: matchedStudent.parentEmail,
           subject: `Vision Grammar School Gate ${nextGateAction}: ${matchedStudent.name} (#${matchedStudent.grNo})`,
           messageText: smsText,
@@ -423,7 +481,7 @@ const AttendanceTaker: React.FC<Props> = ({
     }, 50);
   };
 
-  // --- AI CLASSROOM PHOTO HANDLERS ---
+  // --- AI PHOTO-SCAN HANDLERS ---
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     processFile(file);
@@ -442,10 +500,6 @@ const AttendanceTaker: React.FC<Props> = ({
 
   const processImage = async () => {
     if (!previewUrl || targetStudents.length === 0) return;
-    if (!headcount) {
-      alert('Please enter the total headcount present before processing.');
-      return;
-    }
 
     setIsProcessing(true);
     try {
@@ -459,13 +513,17 @@ const AttendanceTaker: React.FC<Props> = ({
           : AttendanceStatus.ABSENT;
       });
 
+      if (!headcount) {
+        setHeadcount(String(totalFacesDetected || presentStudentIds.length));
+      }
+
       setProcessResult({
         description,
         totalFacesDetected,
         tempStatus: newTempStatus,
       });
     } catch {
-      alert('AI Analysis failed. Please check your network or try manual mode.');
+      alert('AI Analysis failed. Please check your network or try optional manual mode.');
     } finally {
       setIsProcessing(false);
     }
@@ -475,14 +533,14 @@ const AttendanceTaker: React.FC<Props> = ({
     if (isHoliday) return;
     const manualStatus: Record<string, AttendanceStatus> = {};
     targetStudents.forEach((student) => {
-      const existingRecord = attendanceData[student.id]?.[selectedDate];
+      const existingRecord = activeStore[student.id]?.[selectedDate];
       manualStatus[student.id] = existingRecord
         ? existingRecord.status
         : AttendanceStatus.PRESENT;
     });
 
     setProcessResult({
-      description: 'Manual Mode: Direct Roster Entry',
+      description: 'Optional Manual Mode: Direct Roster Entry',
       totalFacesDetected: 0,
       tempStatus: manualStatus,
     });
@@ -498,13 +556,14 @@ const AttendanceTaker: React.FC<Props> = ({
 
   const finalizeAttendance = async () => {
     if (!processResult) return;
-    const newData = { ...attendanceData };
+    const newData = { ...activeStore };
     const nowTime = new Date().toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     });
 
     const absentStudents: Student[] = [];
+    const isManualEntry = processResult.description.includes('Manual');
 
     targetStudents.forEach((student) => {
       const status =
@@ -520,14 +579,28 @@ const AttendanceTaker: React.FC<Props> = ({
             : status === AttendanceStatus.ABSENT
             ? 'ABSENT'
             : 'LEAVE',
-        method: 'AI_PHOTO',
+        method: isManualEntry ? 'MANUAL' : 'AI_PHOTO',
       };
       if (status === AttendanceStatus.ABSENT) {
         absentStudents.push(student);
       }
     });
 
-    setAttendanceData(newData);
+    if (attendanceTarget === 'STAFF') {
+      setStaffAttendance(newData);
+      saveStaffAttendance(newData);
+    } else {
+      setAttendanceData(newData);
+    }
+
+    appendAuditLog({
+      actorName,
+      actorRole,
+      actionType: isManualEntry ? 'ATTENDANCE_MANUAL' : 'ATTENDANCE_AI_PHOTO',
+      targetSummary: `${attendanceTarget === 'STAFF' ? 'Teachers & Staff' : `Class ${selectedClass}`} (${targetStudents.length} members)`,
+      details: `${isManualEntry ? 'Optional Manual Roll-Call' : 'AI Photo-Scan Attendance'} saved for ${selectedDate}: Present=${targetStudents.length - absentStudents.length}, Absent=${absentStudents.length}.`,
+    });
+
     setProcessResult(null);
     setPreviewUrl(null);
     setHeadcount('');
@@ -719,17 +792,17 @@ const AttendanceTaker: React.FC<Props> = ({
     let checkedOut = 0;
     let absent = 0;
     targetStudents.forEach((s) => {
-      const rec = attendanceData[s.id]?.[selectedDate];
+      const rec = activeStore[s.id]?.[selectedDate];
       if (rec?.attendanceState === 'IN') checkedIn++;
       else if (rec?.attendanceState === 'OUT') checkedOut++;
       else if (rec?.status === AttendanceStatus.ABSENT) absent++;
     });
     return { checkedIn, checkedOut, absent };
-  }, [targetStudents, attendanceData, selectedDate]);
+  }, [targetStudents, activeStore, selectedDate]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 text-slate-900">
-      {/* Top Mode Switcher: 1. Live RFID Card Gate Terminal | 2. AI Classroom Photo | 3. GSM SIM / WhatsApp / Email */}
+      {/* Top Mode Switcher: 1. Live RFID Card Gate Terminal | 2. AI Photo-Scan | 3. GSM SIM / WhatsApp / Email */}
       <div className="bg-white p-6 rounded-3xl border-2 border-slate-200 shadow-lg space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div className="flex items-center gap-4">
@@ -740,40 +813,75 @@ const AttendanceTaker: React.FC<Props> = ({
             />
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-900 text-xs font-bold uppercase mb-1">
-                Vision Grammar School · Block 56, D.G. Khan
+                Vision Grammar School · Students, Teachers & Staff Attendance
               </div>
               <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Live RFID Gate Terminal, AI Classroom & GSM SMS Hub
+                Dual-Subsystem Attendance: RFID Gate & AI Photo-Scan
               </h2>
               <p className="text-sm text-slate-700 mt-0.5">
-                Two Attendance Systems: <strong>1) USB RFID Card Gate Reader (IN / OUT)</strong> &{' '}
-                <strong>2) AI Classroom Photo Attendance</strong> — connected to{' '}
-                <strong>Local Mobile GSM SIM SMS, WhatsApp Web & Email</strong>.
+                Primary Subsystems: <strong>1) RFID Card-Based Attendance</strong> &{' '}
+                <strong>2) AI Photo-Scan Attendance</strong> (Manual counting/attendance is optional).
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-slate-50 border-2 border-slate-300 rounded-xl flex items-center px-3.5 py-2">
-              <span className="text-slate-700 text-xs uppercase font-extrabold mr-2">
-                Class:
-              </span>
-              <select
-                value={selectedClass}
-                onChange={(e) => {
-                  setSelectedClass(e.target.value);
+            {/* Target Switcher: Students vs Teachers/Staff */}
+            <div className="bg-slate-100 p-1 rounded-xl border-2 border-slate-300 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setAttendanceTarget('STUDENTS');
+                  setLastTappedCard(null);
                   setProcessResult(null);
                 }}
-                className="bg-transparent text-slate-900 text-sm font-bold outline-none cursor-pointer"
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold uppercase transition-all ${
+                  attendanceTarget === 'STUDENTS'
+                    ? 'bg-blue-700 text-white shadow-sm'
+                    : 'text-slate-700 hover:bg-white'
+                }`}
               >
-                <option value="All">ALL CLASSES</option>
-                {uniqueClasses.map((c) => (
-                  <option key={c} value={c}>
-                    CLASS {c}
-                  </option>
-                ))}
-              </select>
+                🎓 Students ({students.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAttendanceTarget('STAFF');
+                  setLastTappedCard(null);
+                  setProcessResult(null);
+                }}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold uppercase transition-all ${
+                  attendanceTarget === 'STAFF'
+                    ? 'bg-emerald-700 text-white shadow-sm'
+                    : 'text-slate-700 hover:bg-white'
+                }`}
+              >
+                👨‍🏫 Teachers & Staff ({staffList.length})
+              </button>
             </div>
+
+            {attendanceTarget === 'STUDENTS' && (
+              <div className="bg-slate-50 border-2 border-slate-300 rounded-xl flex items-center px-3.5 py-2">
+                <span className="text-slate-700 text-xs uppercase font-extrabold mr-2">
+                  Class:
+                </span>
+                <select
+                  value={selectedClass}
+                  onChange={(e) => {
+                    setSelectedClass(e.target.value);
+                    setProcessResult(null);
+                  }}
+                  className="bg-transparent text-slate-900 text-sm font-bold outline-none cursor-pointer"
+                >
+                  <option value="All">ALL CLASSES</option>
+                  {uniqueClasses.map((c) => (
+                    <option key={c} value={c}>
+                      CLASS {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <input
               type="date"
               value={selectedDate}
@@ -786,7 +894,7 @@ const AttendanceTaker: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* 3 Mode Tabs */}
+        {/* 2 Primary Attendance Subsystems + GSM/WhatsApp Hub */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           <button
             type="button"
@@ -801,11 +909,14 @@ const AttendanceTaker: React.FC<Props> = ({
               <CreditCard className="w-6 h-6" />
             </div>
             <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-blue-700">
+                Primary Subsystem 1
+              </div>
               <div className="text-base font-extrabold text-slate-900">
-                1. 🪪 Live RFID Card Gate (IN / OUT)
+                🪪 RFID Card-Based Attendance
               </div>
               <div className="text-xs font-medium text-slate-600 mt-0.5">
-                Blinking Cursor USB Reader • 1st Tap = IN, 2nd Tap = OUT
+                USB Card Reader • 1st Tap = IN, 2nd Tap = OUT ({attendanceTarget === 'STAFF' ? 'Teachers/Staff' : 'Students'})
               </div>
             </div>
           </button>
@@ -823,11 +934,14 @@ const AttendanceTaker: React.FC<Props> = ({
               <Camera className="w-6 h-6" />
             </div>
             <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                Primary Subsystem 2
+              </div>
               <div className="text-base font-extrabold text-slate-900">
-                2. 📸 AI Classroom Group Photo
+                📸 AI Photo-Scan Attendance
               </div>
               <div className="text-xs font-medium text-slate-600 mt-0.5">
-                Snap Classroom Photo • Seated = Present, Others = Absent
+                AI Vision Face/Seat Scan • Optional Manual Override
               </div>
             </div>
           </button>
@@ -845,11 +959,14 @@ const AttendanceTaker: React.FC<Props> = ({
               <Smartphone className="w-6 h-6" />
             </div>
             <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-indigo-700">
+                Notification Gateway
+              </div>
               <div className="text-base font-extrabold text-slate-900">
-                3. 📱 Mobile GSM SMS, WhatsApp & Email
+                📱 Mobile GSM SMS, WhatsApp & Email
               </div>
               <div className="text-xs font-medium text-slate-600 mt-0.5">
-                Hotspot Virtual SMS Server • WhatsApp Web Login • Email
+                Hotspot Virtual SMS Server • WhatsApp Web • Email
               </div>
             </div>
           </button>
@@ -870,10 +987,10 @@ const AttendanceTaker: React.FC<Props> = ({
                   </span>
                   <div>
                     <h3 className="text-lg font-extrabold text-slate-900">
-                      USB RFID Reader Active — Cursor Blinking & Ready for Card Tap
+                      USB RFID Reader Active ({attendanceTarget === 'STAFF' ? 'Teachers & Staff Mode' : 'Student Mode'}) — Cursor Blinking & Ready
                     </h3>
                     <p className="text-sm text-slate-700 mt-0.5">
-                      Plug in your USB RFID Reader. When a student taps their card, the reader types the serial number below and presses{' '}
+                      Plug in your USB RFID Reader. When a {attendanceTarget === 'STAFF' ? 'teacher or staff member' : 'student'} taps their card, the reader types the serial number below and presses{' '}
                       <code className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-900 font-bold">Enter</code> automatically.{' '}
                       <strong className="text-emerald-800">1st Tap = IN (Arrival)</strong> •{' '}
                       <strong className="text-amber-800">2nd Tap = OUT (Departure)</strong>.
@@ -950,10 +1067,10 @@ const AttendanceTaker: React.FC<Props> = ({
               {/* Quick Demo / Test Simulator Bar so User can test 1st Tap (IN) and 2nd Tap (OUT) with 1 click */}
               <div className="mt-5 pt-4 border-t border-slate-200 flex flex-wrap items-center gap-2.5">
                 <span className="text-sm font-extrabold text-slate-800">
-                  ⚡ Test Card Tap (Click any student below to simulate tapping their RFID Card):
+                  ⚡ Test Card Tap ({attendanceTarget === 'STAFF' ? 'Teachers & Staff' : 'Students'}):
                 </span>
-                {students.map((st) => {
-                  const todayRec = attendanceData[st.id]?.[selectedDate];
+                {targetStudents.map((st) => {
+                  const todayRec = activeStore[st.id]?.[selectedDate];
                   const isAlreadyIn = todayRec?.attendanceState === 'IN';
                   const nextTapLabel = isAlreadyIn ? 'Tap 2nd Time (OUT)' : 'Tap 1st Time (IN)';
                   return (
@@ -1228,7 +1345,7 @@ const AttendanceTaker: React.FC<Props> = ({
 
                   <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
                     {targetStudents.map((st) => {
-                      const rec = attendanceData[st.id]?.[selectedDate];
+                      const rec = activeStore[st.id]?.[selectedDate];
                       const state = rec?.attendanceState;
                       return (
                         <div
@@ -1293,7 +1410,7 @@ const AttendanceTaker: React.FC<Props> = ({
         )}
 
         {/* ===================================================================
-            MODE 2: AI CLASSROOM GROUP PHOTO ATTENDANCE (PRESENT / ABSENT)
+            MODE 2: AI PHOTO-SCAN ATTENDANCE (OPTIONAL MANUAL OVERRIDE)
             =================================================================== */}
         {activeMode === 'ai_photo' && (
           <div>
@@ -1308,34 +1425,8 @@ const AttendanceTaker: React.FC<Props> = ({
                 </p>
               </div>
             ) : !previewUrl && !processResult ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white border-2 border-slate-200 p-8 rounded-2xl flex flex-col items-center justify-center text-center space-y-6 shadow-sm">
-                  <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-200">
-                    <Users className="w-8 h-8 text-blue-700" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-extrabold text-slate-900 mb-2">
-                      1. Classroom Headcount Tally
-                    </h3>
-                    <p className="text-sm text-slate-700 mb-6 font-medium">
-                      Enter the number of students seated in the classroom photo. Seated students will be marked{' '}
-                      <strong className="text-emerald-700">Present</strong> and remaining students <strong className="text-red-700">Absent</strong> (with auto GSM SMS alert).
-                    </p>
-                    <div className="relative inline-block">
-                      <input
-                        type="number"
-                        value={headcount}
-                        onChange={(e) => setHeadcount(e.target.value)}
-                        placeholder="0"
-                        className="w-36 bg-slate-50 border-2 border-slate-300 text-slate-900 text-center text-4xl font-extrabold font-mono py-4 rounded-2xl focus:border-blue-600 outline-none transition-all"
-                      />
-                      <div className="mt-2 bg-blue-700 text-white text-xs font-bold px-3 py-1 rounded-full uppercase">
-                        Seated Count
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
+              <div className="space-y-6">
+                {/* Primary AI Photo-Scan Dropzone (No Mandatory Manual Count Required) */}
                 <div
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -1350,47 +1441,102 @@ const AttendanceTaker: React.FC<Props> = ({
                     setIsDragging(false);
                     processFile(e.dataTransfer.files?.[0]);
                   }}
-                  onClick={() => {
-                    if (!headcount)
-                      return alert('Please enter the headcount first.');
-                    fileInputRef.current?.click();
-                  }}
-                  className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden bg-white shadow-sm ${
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all relative overflow-hidden bg-emerald-50/40 shadow-sm ${
                     isDragging
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-slate-300 hover:border-blue-500 hover:bg-slate-50'
-                  } ${!headcount ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      ? 'border-emerald-600 bg-emerald-100/60'
+                      : 'border-emerald-400 hover:border-emerald-600 hover:bg-emerald-50'
+                  }`}
                 >
-                  <div className="p-5 bg-blue-50 border border-blue-200 rounded-2xl mb-4">
-                    <Upload className="w-8 h-8 text-blue-700" />
+                  <div className="p-5 bg-emerald-600 text-white rounded-2xl mb-4 shadow-md">
+                    <Camera className="w-9 h-9" />
                   </div>
-                  <h3 className="text-xl font-extrabold text-slate-900">
-                    2. Upload Classroom Photo
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-emerald-800 mb-1">
+                    Primary Subsystem 2 · Automatic AI Vision Recognition
+                  </div>
+                  <h3 className="text-2xl font-extrabold text-slate-900">
+                    📸 Upload or Capture {attendanceTarget === 'STAFF' ? 'Staff Room / Teachers' : 'Classroom'} Photo for AI Scan
                   </h3>
-                  <p className="text-sm text-slate-600 mt-2 font-medium">
-                    Upload or capture a photo of the whole classroom for AI attendance
+                  <p className="text-sm text-slate-600 mt-2 max-w-xl font-medium">
+                    AI automatically detects faces & seated {attendanceTarget === 'STAFF' ? 'teachers/staff' : 'students'}, marks them{' '}
+                    <strong className="text-emerald-700">Present</strong>, and marks absent members automatically without requiring manual counting.
                   </p>
+                  <button
+                    type="button"
+                    className="mt-5 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md inline-flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" /> Select or Capture Photo Now
+                  </button>
                   <input
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     accept="image/*"
                     className="hidden"
-                    disabled={!headcount}
                   />
+                </div>
 
-                  <div className="mt-8 pt-6 border-t border-slate-200 w-full">
+                {/* Optional Collapsible Drawer: Manual Counting or Manual Roll-Call */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-extrabold uppercase text-slate-600">
+                        Optional Fallback Tools
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-800">
+                        Manual Headcount Tally & Manual Attendance Roll-Call (Optional)
+                      </h4>
+                    </div>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startManualMode();
-                      }}
-                      className="px-5 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-sm text-amber-950 font-bold border border-amber-300 transition-colors inline-flex items-center gap-2"
+                      onClick={() => setShowOptionalManual(!showOptionalManual)}
+                      className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-extrabold"
                     >
-                      <Unlock className="w-4 h-4" /> Open Manual Roll Call List
+                      {showOptionalManual
+                        ? 'Hide Optional Manual Tools ▲'
+                        : 'Show Optional Manual Attendance / Counting ▼'}
                     </button>
                   </div>
+
+                  {showOptionalManual && (
+                    <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-xs font-extrabold text-slate-800 uppercase">
+                            Optional Manual Headcount
+                          </div>
+                          <div className="text-xs text-slate-600">
+                            Optionally enter seated count to cross-verify AI detection
+                          </div>
+                        </div>
+                        <input
+                          type="number"
+                          value={headcount}
+                          onChange={(e) => setHeadcount(e.target.value)}
+                          placeholder="Auto"
+                          className="w-24 bg-slate-50 border-2 border-slate-300 text-slate-900 text-center text-xl font-extrabold font-mono py-2 rounded-xl focus:border-blue-600 outline-none"
+                        />
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between gap-4">
+                        <div>
+                          <div className="text-xs font-extrabold text-slate-800 uppercase">
+                            Optional Manual Roll-Call
+                          </div>
+                          <div className="text-xs text-slate-600">
+                            Mark Present/Absent/Leave manually (logged in Principal Audit Log)
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => startManualMode()}
+                          className="px-4 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-xs text-amber-950 font-extrabold border border-amber-300 shrink-0 inline-flex items-center gap-1.5"
+                        >
+                          <Unlock className="w-4 h-4" /> Open Manual List
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

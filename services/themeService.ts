@@ -64,12 +64,39 @@ export interface LandingLayoutDefinition {
   badge: string;
 }
 
+export interface LandingPromoBanner {
+  id: string;
+  badge: string;
+  title: string;
+  subtitle: string;
+  ctaText: string;
+  active: boolean;
+}
+
+export interface LandingRecentUpdate {
+  id: string;
+  date: string;
+  title: string;
+  summary: string;
+}
+
+export interface LandingUpcomingEvent {
+  id: string;
+  date: string;
+  title: string;
+  venue: string;
+}
+
 export interface SchoolThemeStudioConfig {
   activeThemeId: ThemeId;
   toggleThemeA: ThemeId;
   toggleThemeB: ThemeId;
   allowVisitorToggle: boolean;
   activeLandingLayout: LandingLayoutId;
+  promoBanners: LandingPromoBanner[];
+  scrollingNews: string[];
+  recentUpdates: LandingRecentUpdate[];
+  upcomingEvents: LandingUpcomingEvent[];
   updatedByRole: 'Admin' | 'Principal';
   updatedAt: string;
 }
@@ -374,6 +401,70 @@ const DEFAULT_STUDIO_CONFIG: SchoolThemeStudioConfig = {
   toggleThemeB: 'midnight-slate',
   allowVisitorToggle: true,
   activeLandingLayout: 'hero-campus',
+  promoBanners: [
+    {
+      id: 'promo-1',
+      badge: 'ADMISSIONS OPEN 2026–27',
+      title: '100% Merit Scholarship for 90%+ Board Scorers',
+      subtitle: 'Playgroup, KG, Primary, Middle & Matric (Science / Computer) admissions now open at Block 56, D.G. Khan.',
+      ctaText: 'Apply for Admission',
+      active: true,
+    },
+    {
+      id: 'promo-2',
+      badge: 'SMART AI & RFID CAMPUS',
+      title: 'Instant Gate RFID Alerts & AI Reading Tutor',
+      subtitle: 'Real-time parent SMS/WhatsApp gate notifications and AI-assisted classroom learning.',
+      ctaText: 'Explore Campus',
+      active: true,
+    },
+  ],
+  scrollingNews: [
+    '📢 Admissions Open for Session 2026–27 (Playgroup to Matric Science & Computer) — Visit Campus Office in Block 56, D.G. Khan.',
+    '🏆 Congratulations! Vision Grammar School students achieved 98.4% pass rate in BISE D.G. Khan Board Examinations.',
+    '🪪 Live RFID Gate Attendance & Parent GSM SMS Alerts are active across all classes.',
+    '📅 Annual Science, Robotics & Qiraat Exhibition scheduled for next Saturday at 09:00 AM.',
+  ],
+  recentUpdates: [
+    {
+      id: 'upd-1',
+      date: '2026-03-22',
+      title: 'Mid-Term Official Result Cards (DMCs) Published Online',
+      summary: 'Parents and students can now verify subject-wise marks, class position, and overall school position online.',
+    },
+    {
+      id: 'upd-2',
+      date: '2026-03-18',
+      title: 'Google Drive Digital Learning Library (KG to Grade 10) Launched',
+      summary: 'Video lectures, structured lesson plans, and printable PDF worksheets added for all classes.',
+    },
+    {
+      id: 'upd-3',
+      date: '2026-03-12',
+      title: 'Upgraded AI Reading & Pronunciation Assessment Studio',
+      summary: 'Individual student reading fluency and book OCR assessments introduced in classrooms.',
+    },
+  ],
+  upcomingEvents: [
+    {
+      id: 'evt-1',
+      date: '2026-04-05',
+      title: 'Parent-Teacher Meeting (PTM) & Result Card Distribution',
+      venue: 'Main Auditorium, Vision Grammar School Block 56',
+    },
+    {
+      id: 'evt-2',
+      date: '2026-04-14',
+      title: 'Annual Science, Computer & Art Exhibition 2026',
+      venue: 'STEM Innovation Hall, Block 56 Campus',
+    },
+    {
+      id: 'evt-3',
+      date: '2026-04-22',
+      title: 'Inter-House Qiraat, Naat & English Speech Competition',
+      venue: 'Assembly Courtyard, Vision Grammar School',
+    },
+  ],
   updatedByRole: 'Admin',
   updatedAt: new Date().toLocaleTimeString(),
 };

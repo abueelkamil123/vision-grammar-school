@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, useDragControls } from 'framer-motion';
 import {
   Student,
   StudentExamRecord,
@@ -6,6 +7,11 @@ import {
   AssistantActionCommand,
 } from '../types';
 import { interpretAppVoiceOrTextCommand } from '../services/tutorService';
+import {
+  loadThemeStudioConfig,
+  getThemeDefinition,
+  SchoolThemeDefinition,
+} from '../services/themeService';
 import {
   Mic,
   MicOff,
@@ -20,7 +26,9 @@ import {
   PhoneCall,
   PhoneOff,
   CheckCircle2,
-  Compass,
+  GripHorizontal,
+  Move,
+  RotateCcw,
 } from 'lucide-react';
 
 interface Props {
@@ -40,13 +48,6 @@ interface ChatTurn {
   actionSummary?: string;
 }
 
-const IDLE_BUBBLE_LINES = [
-  'Say: "Generate exam paper of Mathematics class 8th half course from chapter 1 to 10"',
-  'Teacher tip: "Help me make lesson plan for Science 8th class chapter Light"',
-  'Parent check: "What is the exam result of my son Akhtar Ali student ID 56432?"',
-  'Fee lookup: "What is the fees record of my daughter Maria GR No 563?"',
-];
-
 const ROLE_PRESETS: Record<
   'Admin' | 'Teacher' | 'Parent' | 'Student',
   { label: string; command: string }[]
@@ -58,7 +59,7 @@ const ROLE_PRESETS: Record<
         'Generate exam paper of Mathematics subject class 8th half course from chapter 1 to 10',
     },
     {
-      label: '🗓️ Beaconhouse-Style Monthly Plan',
+      label: '🗓️ 24-Day Monthly Syllabus Plan',
       command:
         'Generate monthly date wise day wise academic plan for Class 9th Science Chapter 1 to 3',
     },
@@ -106,11 +107,22 @@ const FloatingAiAssistant: React.FC<Props> = ({
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const [activeRole, setActiveRole] = useState<'Admin' | 'Teacher' | 'Parent' | 'Student'>(initialRole);
-  const [bubbleText, setBubbleText] = useState<string>(IDLE_BUBBLE_LINES[0]);
-  const [showBubble, setShowBubble] = useState<boolean>(false);
+  const [activeRole, setActiveRole] = useState<'Admin' | 'Teacher' | 'Parent' | 'Student'>(
+    initialRole
+  );
 
-  // AKGFlow Assistant Controls
+  // Sync with current website theme (Light/Dark & 6 Pro Max palettes)
+  const [activeTheme, setActiveTheme] = useState<SchoolThemeDefinition>(() =>
+    getThemeDefinition(loadThemeStudioConfig().activeThemeId)
+  );
+
+  // Draggable state so user can freely move AI Helper with mouse cursor if it covers any button/text
+  const [dragResetKey, setDragResetKey] = useState<number>(0);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const wasDraggedRef = useRef<boolean>(false);
+  const panelDragControls = useDragControls();
+
+  // AI Helper Controls
   const [controlToolsEnabled, setControlToolsEnabled] = useState<boolean>(true);
   const [autoRunActions, setAutoRunActions] = useState<boolean>(true);
   const [readAloud, setReadAloud] = useState<boolean>(true);
@@ -120,15 +132,13 @@ const FloatingAiAssistant: React.FC<Props> = ({
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // Pending Action Plan (when autoRunActions is unchecked, just like AKGFlow assistant_window.py)
   const [pendingAction, setPendingAction] = useState<AssistantActionCommand | null>(null);
-
   const [inputText, setInputText] = useState<string>('');
   const [messages, setMessages] = useState<ChatTurn[]>([
     {
       id: 'init-1',
       sender: 'assistant',
-      text: "Assalam-o-Alaikum! I'm your **ClassGuard Flow AI Assistant** (inspired by AKGFlow Assistant). You can control the entire app using **Voice Commands (Mic)** or **Text** for Admin, Teachers, Parents, and Students!",
+      text: "Assalam-o-Alaikum! I am your **AI Helper** for Vision Grammar School. You can drag me anywhere with your mouse if I cover any text, or control the app using **Voice (Mic)** or **Chat**!",
       timestamp: new Date().toLocaleTimeString(),
     },
   ]);
@@ -136,22 +146,25 @@ const FloatingAiAssistant: React.FC<Props> = ({
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Rotate idle speech bubble lines like floating_icon.py
+  // Listen for live theme changes across the entire website
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!isOpen) {
-        const next =
-          IDLE_BUBBLE_LINES[Math.floor(Math.random() * IDLE_BUBBLE_LINES.length)];
-        setBubbleText(next);
-        setShowBubble(true);
-      }
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [isOpen]);
+    const syncTheme = () => {
+      const cfg = loadThemeStudioConfig();
+      setActiveTheme(getThemeDefinition(cfg.activeThemeId));
+    };
+    window.addEventListener('vision-theme-studio-updated', syncTheme);
+    window.addEventListener('storage', syncTheme);
+    return () => {
+      window.removeEventListener('vision-theme-studio-updated', syncTheme);
+      window.removeEventListener('storage', syncTheme);
+    };
+  }, []);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pendingAction]);
+
+  const v = activeTheme.vars;
 
   const speakReply = (text: string) => {
     if (!readAloud && !voiceCallActive) return;
@@ -219,7 +232,6 @@ const FloatingAiAssistant: React.FC<Props> = ({
     }
   };
 
-  // Browser Web Speech Recognition (Dictation & Live Voice Call)
   const startSpeechRecognition = (autoSendOnResult: boolean) => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -233,7 +245,7 @@ const FloatingAiAssistant: React.FC<Props> = ({
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (e) {}
+      } catch {}
     }
 
     const recognition = new SpeechRecognition();
@@ -290,76 +302,194 @@ const FloatingAiAssistant: React.FC<Props> = ({
 
   return (
     <>
-      {/* FLOATING SPARK MASCOT + SPEECH BUBBLE (Like AKGFlow floating_icon.py) */}
+      {/* =======================================================================
+          1. COMPACT, MOUSE-DRAGGABLE, THEME-MATCHED "AI HELPER" FLOATING BUTTON
+          (No intrusive announcement bubble covering the page!)
+          ======================================================================= */}
       {!isOpen && (
-        <div className="copilot-launcher fixed bottom-5 right-5 z-[90] flex flex-col items-end gap-2">
-          {showBubble && (
-            <div className="max-w-[275px] bg-[#192436] text-[#e7f0ff] border border-[#5c79b5] rounded-2xl p-3 shadow-2xl text-xs relative animate-in fade-in slide-in-from-bottom-2">
-              <button
-                onClick={() => setShowBubble(false)}
-                className="absolute top-1.5 right-2 text-[10px] text-cyber-400 hover:text-white"
-              >
-                ✕
-              </button>
-              <div className="font-mono text-[10px] uppercase text-cyber-400 mb-1 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> AI Voice Copilot Ready
-              </div>
-              <div className="pr-3 leading-relaxed">{bubbleText}</div>
-            </div>
-          )}
-
+        <motion.div
+          key={`launcher-${dragResetKey}`}
+          drag
+          dragMomentum={false}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.97 }}
+          onPointerDown={(e) => {
+            pointerStartRef.current = { x: e.clientX, y: e.clientY };
+            wasDraggedRef.current = false;
+          }}
+          onPointerMove={(e) => {
+            if (!pointerStartRef.current) return;
+            const dx = Math.abs(e.clientX - pointerStartRef.current.x);
+            const dy = Math.abs(e.clientY - pointerStartRef.current.y);
+            if (dx > 6 || dy > 6) {
+              wasDraggedRef.current = true;
+            }
+          }}
+          onPointerUp={() => {
+            pointerStartRef.current = null;
+          }}
+          className="copilot-launcher fixed bottom-5 right-5 z-[90] select-none cursor-grab active:cursor-grabbing"
+          title="AI Helper · Click to open, or drag with mouse to move anywhere on screen"
+        >
           <button
-            onClick={() => setIsOpen(true)}
-            title="ClassGuard Flow Assistant · Click to control app by Voice or Chat"
-            className="group relative w-20 h-20 rounded-full bg-gradient-to-br from-cyber-500 via-blue-600 to-purple-700 p-1 shadow-[0_0_30px_rgba(56,189,248,0.5)] hover:scale-105 transition-all flex items-center justify-center"
+            type="button"
+            onClick={() => {
+              if (wasDraggedRef.current) {
+                wasDraggedRef.current = false;
+                return;
+              }
+              setIsOpen(true);
+            }}
+            style={{
+              background: v['--btn-primary-bg'],
+              boxShadow: v['--btn-primary-shadow'],
+              borderColor: v['--gold'],
+            }}
+            className="group relative flex items-center gap-2.5 pl-2 pr-3.5 py-2 rounded-full border-2 text-white transition-all"
           >
-            <div className="w-full h-full rounded-full bg-[#0f172a] flex flex-col items-center justify-center relative overflow-hidden">
-              {/* Animated FlowSpark Face */}
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyber-400 animate-ping" />
-                <span className="w-2.5 h-2.5 rounded-full bg-cyber-400" />
-              </div>
-              <span className="text-[9px] font-mono font-bold uppercase text-cyber-300 tracking-wider">
-                AI Helper
+            {/* Theme-Matched Logo: School Crest + Animated AI Spark Badge */}
+            <div
+              style={{
+                background: v['--card'],
+                borderColor: v['--gold'],
+              }}
+              className="relative w-10 h-10 rounded-full border-2 flex items-center justify-center shadow-inner shrink-0 overflow-visible"
+            >
+              <img
+                src="/vision-logo-crest.png"
+                alt="AI Helper Logo"
+                className="w-7 h-7 object-contain pointer-events-none"
+              />
+              <span
+                style={{
+                  background: v['--btn-accent-bg'],
+                  color: v['--btn-accent-text'],
+                }}
+                className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center shadow-sm border border-white/60"
+              >
+                <Sparkles className="w-2.5 h-2.5" />
               </span>
             </div>
-            <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-black font-mono font-bold text-[9px] uppercase">
-              Voice
-            </span>
+
+            {/* Label + Subtle Drag Indicator */}
+            <div className="flex flex-col items-start text-left pr-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-extrabold tracking-tight leading-none text-white">
+                  AI Helper
+                </span>
+                <span
+                  style={{
+                    background: v['--btn-accent-bg'],
+                    color: v['--btn-accent-text'],
+                  }}
+                  className="px-1.5 py-0.5 rounded-full font-mono font-extrabold text-[8px] uppercase leading-none"
+                >
+                  Voice
+                </span>
+              </div>
+              <span className="text-[9px] font-medium text-white/85 flex items-center gap-1 mt-0.5">
+                <Move className="w-2.5 h-2.5 opacity-80" /> Drag or Click
+              </span>
+            </div>
           </button>
-        </div>
+        </motion.div>
       )}
 
-      {/* DOCKED AKGFLOW-STYLE ASSISTANT WINDOW (Like assistant_window.py) */}
+      {/* =======================================================================
+          2. THEME-SYNCED, MOUSE-DRAGGABLE "AI HELPER" POPUP WINDOW
+          ======================================================================= */}
       {isOpen && (
-        <div
-          className={`copilot-panel fixed bottom-4 right-4 z-[95] bg-[#0f172a]/95 backdrop-blur-xl border-2 border-[#5c79b5] rounded-3xl shadow-[0_0_50px_rgba(15,23,42,0.9)] flex flex-col overflow-hidden transition-all ${
+        <motion.div
+          key={`panel-${dragResetKey}`}
+          drag
+          dragListener={false}
+          dragControls={panelDragControls}
+          dragMomentum={false}
+          style={{
+            background: v['--card-grad'],
+            borderColor: v['--card-border'],
+            color: v['--ink'],
+            boxShadow: `0 22px 55px rgba(15, 23, 42, 0.28), ${v['--card-glow']}`,
+          }}
+          className={`copilot-panel fixed bottom-4 right-4 z-[95] border-2 rounded-3xl flex flex-col overflow-hidden transition-colors ${
             isExpanded
               ? 'w-[95vw] sm:w-[680px] h-[85vh]'
-              : 'w-[94vw] sm:w-[450px] h-[650px] max-h-[calc(100dvh-32px)]'
+              : 'w-[94vw] sm:w-[440px] h-[630px] max-h-[calc(100dvh-32px)]'
           }`}
         >
-          {/* Header */}
-          <div className="p-3.5 bg-[#192436] border-b border-[#334155] flex items-center justify-between gap-2">
+          {/* Draggable Theme-Matched Header */}
+          <div
+            onPointerDown={(e) => panelDragControls.start(e)}
+            style={{
+              background: v['--banner-grad'],
+              borderColor: v['--line'],
+            }}
+            className="p-3.5 border-b flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing select-none text-white"
+            title="Drag header with mouse to move AI Helper window anywhere"
+          >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyber-400 to-purple-600 flex items-center justify-center shadow-neon">
-                <Sparkles className="w-5 h-5 text-black" />
+              {/* Theme-Matched Logo in Popup Header */}
+              <div
+                style={{
+                  background: v['--card'],
+                  borderColor: v['--gold'],
+                }}
+                className="relative w-11 h-11 rounded-2xl border-2 flex items-center justify-center shadow-md shrink-0"
+              >
+                <img
+                  src="/vision-logo-crest.png"
+                  alt="Vision Grammar School AI Helper"
+                  className="w-8 h-8 object-contain pointer-events-none"
+                />
+                <span
+                  style={{
+                    background: v['--btn-accent-bg'],
+                    color: v['--btn-accent-text'],
+                  }}
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center shadow"
+                >
+                  <Sparkles className="w-2.5 h-2.5" />
+                </span>
               </div>
+
               <div>
-                <div className="text-sm font-bold text-white tracking-tight">
-                  ClassGuard Flow Assistant
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold text-white tracking-tight">
+                    AI Helper
+                  </span>
+                  <span
+                    style={{
+                      background: v['--btn-accent-bg'],
+                      color: v['--btn-accent-text'],
+                    }}
+                    className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase"
+                  >
+                    {activeTheme.name}
+                  </span>
                 </div>
-                <div className="text-[10px] font-mono uppercase text-cyber-400 tracking-widest">
-                  YOUR SMART SCHOOL SIDEKICK • AUTO-CONTROL
+                <div className="text-[10px] font-mono uppercase text-white/85 tracking-wider flex items-center gap-1 mt-0.5">
+                  <GripHorizontal className="w-3.5 h-3.5" /> Drag Header to Move • Smart Voice & Chat
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1.5"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <button
+                type="button"
+                onClick={() => setDragResetKey((k) => k + 1)}
+                title="Reset position to bottom-right corner"
+                className="p-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/25 transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                title="Expand / Restore Assistant"
-                className="p-1.5 rounded-lg bg-cyber-900 hover:bg-cyber-800 text-cyber-300 border border-cyber-700"
+                title="Expand / Restore AI Helper"
+                className="p-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/25 transition-all"
               >
                 {isExpanded ? (
                   <Minimize2 className="w-3.5 h-3.5" />
@@ -368,66 +498,102 @@ const FloatingAiAssistant: React.FC<Props> = ({
                 )}
               </button>
               <button
+                type="button"
                 onClick={() => setIsOpen(false)}
-                title="Minimize to Floating Mascot"
-                className="p-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white border border-rose-400"
+                title="Minimize AI Helper"
+                className="p-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white border border-rose-300/60 transition-all"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Context & Tool Control Toggles (Matching assistant_window.py) */}
-          <div className="px-3.5 py-2 bg-cyber-950/90 border-b border-cyber-800 space-y-2">
+          {/* Context & Tool Control Toggles (Theme-Synced) */}
+          <div
+            style={{
+              background: v['--surface-subtle'],
+              borderColor: v['--line'],
+            }}
+            className="px-3.5 py-2.5 border-b space-y-2"
+          >
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-cyber-400 font-mono">
-                Current context: <strong className="text-white uppercase">{activeTab}</strong>
+              <span style={{ color: v['--muted'] }} className="font-mono">
+                Active Screen:{' '}
+                <strong style={{ color: v['--navy'] }} className="uppercase font-extrabold">
+                  {activeTab}
+                </strong>
               </span>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 text-cyber-300 cursor-pointer">
+              <div className="flex items-center gap-2.5">
+                <label
+                  style={{ color: v['--ink'] }}
+                  className="flex items-center gap-1 cursor-pointer font-semibold"
+                >
                   <input
                     type="checkbox"
                     checked={controlToolsEnabled}
                     onChange={(e) => setControlToolsEnabled(e.target.checked)}
-                    className="accent-cyber-500"
+                    style={{ accentColor: v['--navy'] }}
                   />
                   <span>Control tools</span>
                 </label>
-                <label className="flex items-center gap-1 text-cyber-300 cursor-pointer">
+                <label
+                  style={{ color: v['--ink'] }}
+                  className="flex items-center gap-1 cursor-pointer font-semibold"
+                >
                   <input
                     type="checkbox"
                     checked={autoRunActions}
                     onChange={(e) => setAutoRunActions(e.target.checked)}
-                    className="accent-emerald-500"
+                    style={{ accentColor: v['--teal'] }}
                   />
                   <span>Auto-run</span>
                 </label>
               </div>
             </div>
 
-            {/* Role Selector + One-Click Voice/Text Command Presets */}
-            <div className="flex gap-1">
-              {(['Admin', 'Teacher', 'Parent', 'Student'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setActiveRole(r)}
-                  className={`flex-1 py-1 rounded-lg text-[10px] font-mono uppercase font-bold transition-all ${
-                    activeRole === r
-                      ? 'bg-cyber-500 text-black'
-                      : 'bg-cyber-900 text-cyber-400 hover:text-white'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
+            {/* Role Selector Tabs synced with Theme */}
+            <div className="flex gap-1.5">
+              {(['Admin', 'Teacher', 'Parent', 'Student'] as const).map((r) => {
+                const isSelected = activeRole === r;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setActiveRole(r)}
+                    style={
+                      isSelected
+                        ? {
+                            background: v['--btn-primary-bg'],
+                            color: '#ffffff',
+                            borderColor: v['--navy'],
+                          }
+                        : {
+                            background: v['--card'],
+                            color: v['--muted'],
+                            borderColor: v['--line'],
+                          }
+                    }
+                    className="flex-1 py-1.5 rounded-xl text-[10px] font-mono uppercase font-extrabold border transition-all"
+                  >
+                    {r}
+                  </button>
+                );
+              })}
             </div>
 
+            {/* One-Click Preset Command Chips synced with Theme */}
             <div className="flex flex-wrap gap-1.5">
               {ROLE_PRESETS[activeRole].map((preset, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => handleSendCommand(preset.command)}
-                  className="px-2.5 py-1 rounded-lg bg-[#192436] hover:bg-cyber-800 border border-[#5c79b5]/50 text-[11px] text-cyber-200 transition-all text-left"
+                  style={{
+                    background: v['--card'],
+                    borderColor: v['--card-border'],
+                    color: v['--ink'],
+                  }}
+                  className="px-2.5 py-1 rounded-xl border text-[11px] font-semibold hover:opacity-90 transition-all text-left shadow-sm"
                 >
                   {preset.label}
                 </button>
@@ -435,62 +601,111 @@ const FloatingAiAssistant: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Chat Transcript Area */}
-          <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`flex flex-col ${
-                  m.sender === 'user' ? 'items-end' : 'items-start'
-                }`}
-              >
+          {/* Chat Transcript Area synced with Theme */}
+          <div
+            style={{ background: v['--cream'] }}
+            className="flex-1 overflow-y-auto p-3.5 space-y-3"
+          >
+            {messages.map((m) => {
+              const isUser = m.sender === 'user';
+              return (
                 <div
-                  className={`max-w-[88%] rounded-2xl p-3 text-xs leading-relaxed ${
-                    m.sender === 'user'
-                      ? 'bg-cyber-500 text-black font-medium'
-                      : 'bg-[#192436] border border-[#5c79b5]/40 text-[#e7f0ff]'
-                  }`}
+                  key={m.id}
+                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                 >
-                  <div className="whitespace-pre-wrap">{m.text}</div>
-                  {m.actionSummary && (
-                    <div className="mt-2 px-2.5 py-1.5 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 flex items-center gap-1.5 text-[11px] font-mono">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Executed: {m.actionSummary}</span>
-                    </div>
-                  )}
+                  <div
+                    style={
+                      isUser
+                        ? {
+                            background: v['--btn-primary-bg'],
+                            color: '#ffffff',
+                            boxShadow: v['--btn-primary-shadow'],
+                          }
+                        : {
+                            background: v['--card'],
+                            borderColor: v['--card-border'],
+                            color: v['--ink'],
+                          }
+                    }
+                    className={`max-w-[88%] rounded-2xl p-3 text-xs leading-relaxed ${
+                      isUser ? 'font-semibold' : 'border shadow-sm'
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap">{m.text}</div>
+                    {m.actionSummary && (
+                      <div
+                        style={{
+                          background: v['--gold-soft'],
+                          borderColor: v['--gold'],
+                          color: v['--ink'],
+                        }}
+                        className="mt-2 px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-[11px] font-mono font-bold"
+                      >
+                        <CheckCircle2
+                          style={{ color: v['--teal'] }}
+                          className="w-3.5 h-3.5 shrink-0"
+                        />
+                        <span>Executed: {m.actionSummary}</span>
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    style={{ color: v['--muted'] }}
+                    className="text-[9px] font-mono mt-1 px-1"
+                  >
+                    {m.timestamp}
+                  </span>
                 </div>
-                <span className="text-[9px] text-cyber-500 font-mono mt-0.5 px-1">
-                  {m.timestamp}
-                </span>
-              </div>
-            ))}
+              );
+            })}
             {isProcessing && (
-              <div className="text-xs font-mono text-cyber-400 animate-pulse">
-                Flow Assistant is executing your command...
+              <div
+                style={{ color: v['--navy'] }}
+                className="text-xs font-mono font-bold animate-pulse"
+              >
+                AI Helper is processing your request...
               </div>
             )}
             <div ref={transcriptEndRef} />
           </div>
 
-          {/* Action Review Panel (When autoRunActions is off, just like assistant_window.py) */}
+          {/* Action Review Panel (When autoRunActions is off) */}
           {pendingAction && (
-            <div className="mx-3.5 mb-2 p-2.5 rounded-xl bg-amber-950/60 border border-amber-500/50 flex items-center justify-between gap-2 text-xs">
-              <div className="text-amber-200 truncate">
+            <div
+              style={{
+                background: v['--gold-soft'],
+                borderColor: v['--gold'],
+                color: v['--ink'],
+              }}
+              className="mx-3.5 mb-2 p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs"
+            >
+              <div className="truncate">
                 <strong>Ready:</strong> {pendingAction.summaryText}
               </div>
               <div className="flex gap-1.5 shrink-0">
                 <button
+                  type="button"
                   onClick={() => {
                     onExecuteCommand(pendingAction);
                     setPendingAction(null);
                   }}
-                  className="px-2.5 py-1 rounded bg-emerald-500 text-black font-bold flex items-center gap-1"
+                  style={{
+                    background: v['--btn-primary-bg'],
+                    color: '#ffffff',
+                  }}
+                  className="px-2.5 py-1 rounded-lg font-bold flex items-center gap-1"
                 >
                   <Play className="w-3 h-3" /> Apply / Run
                 </button>
                 <button
+                  type="button"
                   onClick={() => setPendingAction(null)}
-                  className="px-2 py-1 rounded bg-cyber-800 text-cyber-300"
+                  style={{
+                    background: v['--card'],
+                    color: v['--muted'],
+                    borderColor: v['--line'],
+                  }}
+                  className="px-2 py-1 rounded-lg border"
                 >
                   Dismiss
                 </button>
@@ -498,8 +713,14 @@ const FloatingAiAssistant: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Compose Area with Dictation Mic & Send Button */}
-          <div className="p-3 bg-[#192436] border-t border-[#334155] space-y-2">
+          {/* Compose Area with Dictation Mic & Send Button synced with Theme */}
+          <div
+            style={{
+              background: v['--surface-subtle'],
+              borderColor: v['--line'],
+            }}
+            className="p-3 border-t space-y-2.5"
+          >
             <div className="flex gap-2">
               <textarea
                 value={inputText}
@@ -510,38 +731,64 @@ const FloatingAiAssistant: React.FC<Props> = ({
                     handleSendCommand();
                   }
                 }}
-                placeholder="Speak or type command (e.g., 'Make Class 8 Math Exam Ch 1-10' or 'Result of Akhtar Ali 56432')..."
-                className="flex-1 h-14 bg-[#0f172a] border border-[#5c79b5]/60 rounded-xl p-2.5 text-xs text-white outline-none resize-none"
+                style={{
+                  background: v['--card'],
+                  borderColor: v['--card-border'],
+                  color: v['--ink'],
+                }}
+                placeholder="Ask AI Helper by voice or text (e.g., 'Make Class 8 Math Exam' or 'Result of Akhtar Ali 56432')..."
+                className="flex-1 h-14 border-2 rounded-xl p-2.5 text-xs outline-none resize-none font-medium"
               />
               <button
+                type="button"
                 onClick={toggleDictation}
                 title="Dictate voice command into message"
-                className={`w-10 rounded-xl flex items-center justify-center border transition-all ${
+                style={
                   isDictating
-                    ? 'bg-red-600 border-red-400 text-white animate-pulse'
-                    : 'bg-cyber-900 hover:bg-cyber-800 border-cyber-600 text-cyber-300'
+                    ? undefined
+                    : {
+                        background: v['--card'],
+                        borderColor: v['--card-border'],
+                        color: v['--navy'],
+                      }
+                }
+                className={`w-11 rounded-xl flex items-center justify-center border-2 transition-all ${
+                  isDictating ? 'bg-red-600 border-red-400 text-white animate-pulse' : ''
                 }`}
               >
                 {isDictating ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
               <button
+                type="button"
                 onClick={() => handleSendCommand()}
-                title="Send & Auto-Execute Command"
-                className="w-10 rounded-xl bg-cyber-500 hover:bg-cyber-400 text-black font-bold flex items-center justify-center"
+                title="Send Command to AI Helper"
+                style={{
+                  background: v['--btn-accent-bg'],
+                  color: v['--btn-accent-text'],
+                  boxShadow: v['--btn-accent-shadow'],
+                }}
+                className="w-11 rounded-xl font-extrabold flex items-center justify-center transition-transform active:translate-y-0.5"
               >
                 <Send className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Bottom Voice Call & Language Bar (Matching assistant_window.py) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            {/* Bottom Voice Call & Language Bar synced with Theme */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={toggleVoiceCall}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  style={
                     voiceCallActive
-                      ? 'bg-red-600 text-white animate-pulse'
-                      : 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                      ? undefined
+                      : {
+                          background: v['--btn-primary-bg'],
+                          color: '#ffffff',
+                        }
+                  }
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-sm ${
+                    voiceCallActive ? 'bg-red-600 text-white animate-pulse' : ''
                   }`}
                 >
                   {voiceCallActive ? (
@@ -558,8 +805,13 @@ const FloatingAiAssistant: React.FC<Props> = ({
                 <select
                   value={voiceLang}
                   onChange={(e) => setVoiceLang(e.target.value as 'en-US' | 'ur-PK')}
-                  className="bg-[#0f172a] border border-cyber-700 rounded-lg px-2 py-1 text-[11px] text-white"
-                  title="Speech input and reply language: Urdu or English. Urdu never falls back to Hindi."
+                  style={{
+                    background: v['--card'],
+                    borderColor: v['--card-border'],
+                    color: v['--ink'],
+                  }}
+                  className="border rounded-xl px-2.5 py-1.5 text-[11px] font-bold"
+                  title="Speech input and reply language"
                 >
                   <option value="en-US">English / Roman Urdu</option>
                   <option value="ur-PK">Urdu (پاکستان)</option>
@@ -568,12 +820,22 @@ const FloatingAiAssistant: React.FC<Props> = ({
 
               <div className="flex items-center gap-1.5">
                 <button
+                  type="button"
                   onClick={() => setReadAloud(!readAloud)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] border flex items-center gap-1 ${
+                  style={
                     readAloud
-                      ? 'bg-cyber-500/20 border-cyber-400 text-cyber-300'
-                      : 'bg-cyber-900 border-cyber-700 text-cyber-500'
-                  }`}
+                      ? {
+                          background: v['--gold-soft'],
+                          borderColor: v['--gold'],
+                          color: v['--ink'],
+                        }
+                      : {
+                          background: v['--card'],
+                          borderColor: v['--line'],
+                          color: v['--muted'],
+                        }
+                  }
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold border flex items-center gap-1"
                 >
                   {readAloud ? (
                     <Volume2 className="w-3.5 h-3.5" />
@@ -584,8 +846,9 @@ const FloatingAiAssistant: React.FC<Props> = ({
                 </button>
                 {isSpeaking && (
                   <button
+                    type="button"
                     onClick={stopSpeaking}
-                    className="px-2 py-1 rounded-lg bg-rose-700 text-white text-[10px]"
+                    className="px-2.5 py-1.5 rounded-xl bg-rose-600 text-white text-[10px] font-bold"
                   >
                     Stop
                   </button>
@@ -593,7 +856,7 @@ const FloatingAiAssistant: React.FC<Props> = ({
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
     </>
   );

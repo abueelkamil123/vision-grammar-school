@@ -1,4 +1,3 @@
-
 export enum AttendanceStatus {
   PRESENT = 'Present',
   ABSENT = 'Absent',
@@ -240,6 +239,9 @@ export interface StudentExamRecord {
   percentage: number;
   overallGrade: string;
   positionInClass?: string;
+  overallSchoolPosition?: string;
+  checkedByMode?: 'MANUAL' | 'AI_ASSISTED';
+  checkedByTeacher?: string;
   aiPrincipalRemarks: string;
 }
 
@@ -282,5 +284,208 @@ export interface AssistantActionCommand {
   summaryText: string;
 }
 
+// --- STAFF / TEACHER ATTENDANCE & DIRECTORY TYPES ---
+export interface StaffMember {
+  id: string;
+  empId: string;
+  rfidCardNo: string;
+  name: string;
+  designation: string;
+  subject: string;
+  assignedClasses: string[];
+  phone: string;
+  email: string;
+  salaryPKR: number;
+  status: 'Active' | 'Suspended';
+  role: 'Teacher' | 'Admin' | 'Staff';
+  courseCompletionRate: number; // 0 to 100
+  performanceScore: number;     // 0 to 100
+  photoUrl?: string;
+}
 
+export interface StaffAttendanceData {
+  [staffId: string]: {
+    [date: string]: DailyRecord;
+  };
+}
 
+// --- SAVED QUESTION PAPERS & AI ANSWER SHEET CHECKING ---
+export interface SavedQuestionPaper extends ExamPaperResult {
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  examDate: string;
+  instructions: string[];
+}
+
+export interface AnswerSheetAiCheckResult {
+  studentId: string;
+  subject: string;
+  totalMarks: number;
+  suggestedObtainedMarks: number;
+  grade: string;
+  questionBreakdown: {
+    qLabel: string;
+    maxMarks: number;
+    awardedMarks: number;
+    feedback: string;
+  }[];
+  overallRemarks: string;
+  detectedWeaknesses: string[];
+}
+
+// --- GOOGLE DRIVE CLASSROOM LEARNING MATERIALS (KG TO GRADE 10) ---
+export interface DriveMaterialItem {
+  id: string;
+  grade: string; // 'KG' | 'Nursery' | 'Prep' | '1-A' ... '10-A'
+  subject: string;
+  topic: string;
+  title: string;
+  resourceType: 'Video' | 'LessonPlan' | 'WorksheetPDF' | 'AI_Generated';
+  driveUrl: string;
+  durationOrPages: string;
+  scheduleDayLabel?: string;
+  description: string;
+}
+
+// --- LIVE CAMERA + VOICE + OCR READING ASSESSMENT RECORD ---
+export interface ReadingOcrAssessment {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  subject: string;
+  topicTitle: string;
+  teacherInstructions: string;
+  capturedBookOcrText: string;
+  studentSpokenTranscript: string;
+  ambientNoiseDb: number;
+  noiseStatus: 'Optimal' | 'Moderate' | 'Noisy';
+  fluencyScore: number;        // 0 to 100
+  pronunciationScore: number;  // 0 to 100
+  overallScoreOutOf10: number; // 0 to 10
+  wordsPerMinute: number;
+  mispronouncedWords: string[];
+  skippedWords: string[];
+  strengths: string[];
+  weaknesses: string[];
+  aiFeedback: string;
+  remedialTask: string;
+  ocrSnapshotsCount: number;
+  assessedByTeacher: string;
+  createdAt: string;
+}
+
+// --- AUDIT LOG SYSTEM (FOR PRINCIPAL OVERSIGHT OF ALL TEACHER ENTRIES/EDITS) ---
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  actorName: string;
+  actorRole: 'Teacher' | 'Admin' | 'Principal' | 'Staff';
+  actionCategory: 'ATTENDANCE' | 'EXAM_MARKS' | 'QUESTION_PAPER' | 'AI_TUTOR_ASSESSMENT' | 'SYLLABUS' | 'ACCESS_CONTROL' | 'FINANCE';
+  actionTitle: string;
+  targetEntity: string;
+  details: string;
+}
+
+// --- PRINCIPAL TASK ASSIGNMENT & TRACKING ---
+export interface SchoolTaskAssignment {
+  id: string;
+  title: string;
+  description: string;
+  assignedToId: string;
+  assignedToName: string;
+  assignedToRole: 'Teacher' | 'Staff' | 'Admin';
+  targetClass?: string;
+  subject?: string;
+  dueDate: string;
+  createdAt: string;
+  priority: 'High' | 'Medium' | 'Low';
+  status: 'Completed' | 'In_Progress' | 'Pending_Overdue';
+  completedAt?: string;
+  completionNotes?: string;
+}
+
+// --- SCHOOL INCOME & EXPENSE LEDGER ---
+export interface SchoolFinanceEntry {
+  id: string;
+  date: string;
+  type: 'Income' | 'Expense';
+  category: 'Tuition_Fee' | 'Admission_Fee' | 'Exam_Fee' | 'Staff_Salary' | 'Utilities_Electricity' | 'Printing_Stationery' | 'Campus_Maintenance' | 'Lab_Equipment';
+  title: string;
+  amountPKR: number;
+  recordedBy: string;
+  referenceNo?: string;
+}
+
+// --- ACCESS MANAGEMENT (RBAC PROFILES, PERMISSIONS CHECKLIST & USER ACCOUNTS) ---
+export type PermissionKey =
+  | 'attendance.rfid'
+  | 'attendance.ai_photo'
+  | 'attendance.manual'
+  | 'attendance.staff'
+  | 'exams.paper_create'
+  | 'exams.paper_print'
+  | 'exams.ai_check'
+  | 'exams.marks_entry'
+  | 'exams.dmc_print'
+  | 'tutor.drive_materials'
+  | 'tutor.ai_materials'
+  | 'tutor.reading_ocr'
+  | 'tutor.classwork_check'
+  | 'fees.view'
+  | 'fees.collect'
+  | 'fees.expense_manage'
+  | 'admin.access_control'
+  | 'admin.theme_cms'
+  | 'admin.ai_agents'
+  | 'admin.audit_logs'
+  | 'public.result_lookup'
+  | 'public.admission_apply';
+
+export interface RolePermissionProfile {
+  id: string;
+  name: string;
+  targetRole: 'Admin' | 'Principal' | 'Teacher' | 'Parent' | 'Student' | 'Public';
+  description: string;
+  isPredefined: boolean;
+  permissions: PermissionKey[];
+}
+
+export interface ManagedUserAccount {
+  id: string;
+  name: string;
+  usernameOrId: string;
+  email: string;
+  phone: string;
+  role: 'Admin' | 'Principal' | 'Teacher' | 'Parent' | 'Student';
+  linkedEntityId?: string; // studentId or staffId
+  gradeOrDept?: string;
+  accessPinMask?: string;  // Masked indicator only (no plaintext credentials in repo)
+  status: 'Active' | 'Suspended';
+  profileId: string;
+  customPermissions?: PermissionKey[];
+  lastLogin?: string;
+}
+
+// --- AI AGENTS, SUBSCRIPTION CLI & ANTI-API CONFIGURATION ---
+export type SchoolAiProvider =
+  | 'codex-cli'      // ChatGPT Plus/Pro Subscription via Codex CLI
+  | 'claude-cli'     // Claude Pro/Max Subscription via Claude Code CLI
+  | 'gemini-cli'     // Google AI Pro/Ultra Subscription via Antigravity CLI (agy)
+  | 'anti-api'       // Antigravity Subscription Local Proxy (anti-api repo)
+  | 'gemini-api'     // Google Gemini Paid/Free API Key
+  | 'openai-api'     // OpenAI API Key
+  | 'claude-api';    // Anthropic Claude API Key
+
+export interface SchoolAiAgentConfig {
+  agentKey: string;
+  label: string;
+  category: 'attendance_vision' | 'exam_engine' | 'classroom_tutor' | 'executive_audit';
+  description: string;
+  provider: SchoolAiProvider;
+  model: string;
+  recommendedProvider: SchoolAiProvider;
+  recommendedModel: string;
+  recommendedReason: string;
+}

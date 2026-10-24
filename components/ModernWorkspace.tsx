@@ -69,6 +69,13 @@ import {
   DualThemeToggleBar,
   AdminPrincipalThemeStudio,
 } from './ThemeAndLandingStudio';
+import {
+  DriveMaterialsHub,
+  LiveReadingAiTutor,
+  PrincipalExecutiveAnalytics,
+  AccessManagementSuite,
+  AiAgentsAndCliHub,
+} from './TeacherAndAdminSuites';
 
 export type Role = 'Admin' | 'Principal' | 'Teacher' | 'Parent' | 'Student';
 export type Page =
@@ -744,9 +751,17 @@ export function Dashboard({
     parentPortalLive: true,
   });
 
-  // Teacher state: selected class & subject for daily mawaad preview
+  // Teacher state: selected class & subject for daily mawaad preview + clean categorised tool tab
   const [teacherClass, setTeacherClass] = useState<string>('8-A');
   const [teacherSubject, setTeacherSubject] = useState<string>('Mathematics');
+  const [teacherSubView, setTeacherSubView] = useState<
+    'overview' | 'drive' | 'reading_tutor'
+  >('overview');
+
+  // Admin / Principal state: clean categorised executive suite tab
+  const [adminSubView, setAdminSubView] = useState<
+    'executive' | 'rbac' | 'ai_cli' | 'theme_cms' | 'teacher_tools' | 'gateways'
+  >('executive');
 
   const copyToClipboard = (text: string, label: string) => {
     if (navigator.clipboard) {
@@ -819,37 +834,37 @@ export function Dashboard({
       </div>
 
       {/* =====================================================================
-          1. ADMIN DASHBOARD (APIs, Websites, Gateways & Campus Command)
+          1. ADMIN DASHBOARD (Clean Categorised Executive Command, RBAC, AI CLIs & CMS)
           ===================================================================== */}
       {role === 'Admin' && (
         <div className="space-y-6">
           <section className="welcome-banner banner-admin">
             <div>
               <span className="banner-kicker">
-                <Server size={15} /> SUPERADMIN INFRASTRUCTURE · APIS · EXTERNAL WEBSITES
+                <Server size={15} /> SUPERADMIN INFRASTRUCTURE · RBAC · SUBSCRIPTION AI CLIS · CMS
               </span>
               <h2>System Control Center — Vision Grammar School, Block 56</h2>
               <p>
-                Configure your Google Gemini AI keys, WhatsApp parent broadcast APIs,
-                external school websites, online admission portals, and campus-wide fee
-                recovery from one command deck.
+                Monitor staff & student attendance ratios, course completion, income/expense
+                charts, teacher audit logs, role-based access control (RBAC), ChatGPT Codex /
+                Claude / Antigravity (`anti-api`) subscriptions, and landing page CMS.
               </p>
               <div className="banner-btn-group">
                 <LogoClipButton
-                  label="Fee Ledger & DMC Records"
-                  sublabel="Verify Challans & Results"
-                  clipText="💳 Open PKR"
+                  label="RFID & AI Photo Attendance"
+                  sublabel="Students + Teachers/Staff Gate"
+                  clipText="🪪 Gate Live"
                   variant="gold"
                   useSchoolSeal
-                  onClick={() => navigate('records')}
+                  onClick={() => navigate('attendance')}
                 />
                 <LogoClipButton
-                  label="Live RFID Gate & GSM SMS"
-                  sublabel="USB Card IN/OUT + AI Photo + Mobile SMS"
-                  clipText="🪪 Gate Live"
+                  label="Exams, AI Sheet Check & DMCs"
+                  sublabel="Papers, Class/School Positions & Fee PKR"
+                  clipText="🏆 Exams & DMC"
                   variant="white"
-                  icon={<Camera size={17} />}
-                  onClick={() => navigate('attendance')}
+                  icon={<Award size={17} />}
+                  onClick={() => navigate('records')}
                 />
                 <LogoClipButton
                   label="Copy School Portal Link"
@@ -881,259 +896,282 @@ export function Dashboard({
             </div>
           </section>
 
-          {/* Admin-Exclusive Metric Highlights */}
-          <div className="metric-grid">
-            <Tilt3DCard className="metric-card admin-metric" intensity={10}>
-              <div className="metric-top">
-                <span>Active API & AI Gateways</span>
-                <span className="metric-icon mint">
-                  <Key size={19} />
-                </span>
-              </div>
-              <strong>6 / 6 Online</strong>
-              <small>Gemini AI · Vision · WhatsApp · BISE Sync</small>
-            </Tilt3DCard>
-
-            <Tilt3DCard className="metric-card admin-metric" intensity={10}>
-              <div className="metric-top">
-                <span>Total Fee Collected (PKR)</span>
-                <span className="metric-icon blue">
-                  <Wallet size={19} />
-                </span>
-              </div>
-              <strong>Rs {totalFeesCollected.toLocaleString()}</strong>
-              <small>Verified across issued challans</small>
-            </Tilt3DCard>
-
-            <Tilt3DCard className="metric-card admin-metric" intensity={10}>
-              <div className="metric-top">
-                <span>Pending Fee Recovery</span>
-                <span className="metric-icon peach">
-                  <Bell size={19} />
-                </span>
-              </div>
-              <strong>Rs {totalFeesPending.toLocaleString()}</strong>
-              <small>WhatsApp auto-reminders active</small>
-            </Tilt3DCard>
-
-            <Tilt3DCard className="metric-card admin-metric" intensity={10}>
-              <div className="metric-top">
-                <span>Connected School Websites</span>
-                <span className="metric-icon purple">
-                  <Globe2 size={19} />
-                </span>
-              </div>
-              <strong>4 Portals</strong>
-              <small>Main Web · BISE · Parent App · Fee Pay</small>
-            </Tilt3DCard>
+          {/* Clean Categorised Admin/Principal Tool Navigation Bar */}
+          <div className="bg-white rounded-3xl border-2 border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {[
+                {
+                  id: 'executive',
+                  label: '📊 1. Performance, Attendance, Finance, Tasks & Audit Log',
+                },
+                {
+                  id: 'rbac',
+                  label: '🔐 2. Access Management (RBAC & Users)',
+                },
+                {
+                  id: 'ai_cli',
+                  label: '🤖 3. AI Agents & Subscription CLIs (Codex / Claude / anti-api)',
+                },
+                {
+                  id: 'theme_cms',
+                  label: '🎨 4. Theme, Colours & Landing Page CMS',
+                },
+                {
+                  id: 'teacher_tools',
+                  label: '👩‍🏫 5. All Teacher Tools (Drive KG–10 & Reading OCR Tutor)',
+                },
+                {
+                  id: 'gateways',
+                  label: '🌐 6. Webhooks & External Portals',
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAdminSubView(tab.id as any)}
+                  className={`px-3.5 py-2.5 rounded-2xl text-xs font-extrabold transition-all ${
+                    adminSubView === tab.id
+                      ? 'bg-blue-700 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Admin API Configuration & External Websites Grid */}
-          <div className="chart-grid">
-            <Tilt3DCard className="dashboard-card" intensity={4}>
-              <div className="card-heading">
-                <div>
-                  <h2>🔑 API Keys & AI Engine Configuration (Admin Only)</h2>
-                  <p>Set Google Gemini API key, WhatsApp Cloud Webhook & system switches</p>
-                </div>
-                <span className="soft-badge">Encrypted Local Config</span>
-              </div>
+          {adminSubView === 'executive' && (
+            <PrincipalExecutiveAnalytics
+              students={students}
+              attendanceData={attendance}
+              examRecords={exams}
+            />
+          )}
 
-              <div className="admin-api-form">
-                <label className="admin-field">
-                  <span>Google Gemini AI API Key (`gemini-3-flash` / `pro`)</span>
-                  <div className="admin-input-row">
-                    <input
-                      type="password"
-                      value={geminiKey}
-                      onChange={(e) => setGeminiKey(e.target.value)}
-                      placeholder="AIzaSy... (Paste Gemini API Key here)"
-                    />
-                    <button
-                      type="button"
-                      className="clip-mini-btn"
-                      onClick={() =>
-                        copyToClipboard(
-                          geminiKey || 'AIzaSy-DemoKey',
-                          'Gemini API Key Copied to Clipboard!'
-                        )
-                      }
-                    >
-                      📋 Copy
-                    </button>
+          {adminSubView === 'rbac' && <AccessManagementSuite />}
+
+          {adminSubView === 'ai_cli' && <AiAgentsAndCliHub />}
+
+          {adminSubView === 'theme_cms' && (
+            <AdminPrincipalThemeStudio role="Admin" onPreviewLanding={onHome} />
+          )}
+
+          {adminSubView === 'teacher_tools' && (
+            <div className="space-y-8">
+              <DriveMaterialsHub actorName="SuperAdmin" actorRole="ADMIN" />
+              <LiveReadingAiTutor
+                students={students}
+                actorName="SuperAdmin"
+                actorRole="ADMIN"
+              />
+            </div>
+          )}
+
+          {adminSubView === 'gateways' && (
+            <div className="chart-grid">
+              <Tilt3DCard className="dashboard-card" intensity={4}>
+                <div className="card-heading">
+                  <div>
+                    <h2>🔑 API Keys & AI Engine Configuration (Admin Only)</h2>
+                    <p>Set Google Gemini API key, WhatsApp Cloud Webhook & system switches</p>
                   </div>
-                </label>
-
-                <label className="admin-field">
-                  <span>WhatsApp Parent Broadcast & SMS Gateway Webhook</span>
-                  <div className="admin-input-row">
-                    <input
-                      type="text"
-                      value={whatsappWebhook}
-                      onChange={(e) => setWhatsappWebhook(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="clip-mini-btn"
-                      onClick={() =>
-                        copyToClipboard(
-                          whatsappWebhook,
-                          'Webhook URL Copied to Clipboard!'
-                        )
-                      }
-                    >
-                      📋 Copy
-                    </button>
-                  </div>
-                </label>
-
-                <div className="admin-toggle-grid">
-                  {[
-                    ['geminiAi', 'Gemini AI Lesson & Exam Engine'],
-                    ['whatsappAlerts', 'WhatsApp Auto-Absent & Fee SMS'],
-                    ['biseDgKhanSync', 'BISE D.G. Khan Board Pattern Sync'],
-                    ['onlineFeeGateway', '1-Link / JazzCash / EasyPaisa Fee API'],
-                  ].map(([key, label]) => {
-                    const enabled =
-                      adminToggles[key as keyof typeof adminToggles];
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() =>
-                          setAdminToggles((prev) => ({
-                            ...prev,
-                            [key]: !prev[key as keyof typeof adminToggles],
-                          }))
-                        }
-                        className={`admin-switch-pill ${enabled ? 'on' : 'off'}`}
-                      >
-                        <span className="switch-dot" />
-                        <span>{label}</span>
-                        <strong>{enabled ? 'ON' : 'OFF'}</strong>
-                      </button>
-                    );
-                  })}
+                  <span className="soft-badge">Encrypted Local Config</span>
                 </div>
 
-                <div className="admin-save-row">
-                  <LogoClipButton
-                    label="Save API Keys & Gateway Settings"
-                    clipText="📋 Save Config"
-                    variant="navy"
-                    useSchoolSeal
-                    onClick={saveAdminApiKey}
-                  />
-                </div>
-              </div>
-            </Tilt3DCard>
-
-            <Tilt3DCard className="dashboard-card" intensity={4}>
-              <div className="card-heading">
-                <div>
-                  <h2>🌐 External Websites & Portal Controls</h2>
-                  <p>Control connected websites, admissions & BISE D.G. Khan portals</p>
-                </div>
-                <span className="soft-badge">4 Websites Linked</span>
-              </div>
-
-              <div className="website-control-list">
-                {[
-                  {
-                    name: 'Vision Grammar School Main Website',
-                    url: 'https://visiongrammarschool.edu.pk',
-                    status: 'Live · Admissions Open',
-                    clip: '📋 Copy Site',
-                  },
-                  {
-                    name: 'BISE D.G. Khan Board Enrolment Portal',
-                    url: 'https://bisedgkhan.edu.pk',
-                    status: 'Synced · 9th/10th Registration',
-                    clip: '🏛️ Board Link',
-                  },
-                  {
-                    name: 'Parent Online DMC & Fee Voucher Portal',
-                    url: 'https://portal.visiongrammarschool.edu.pk',
-                    status: 'Active · Instant DMC Lookup',
-                    clip: '📋 Copy Portal',
-                  },
-                  {
-                    name: 'Digital Textbook & PCTB Syllabus Cloud',
-                    url: 'https://pctb.punjab.gov.pk',
-                    status: 'Connected · Class 1–10 Books',
-                    clip: '📚 PCTB Link',
-                  },
-                ].map((site) => (
-                  <div key={site.name} className="website-control-item">
-                    <div className="website-info">
-                      <img
-                        src="/vision-logo-crest.png"
-                        alt=""
-                        className="website-mini-seal"
+                <div className="admin-api-form">
+                  <label className="admin-field">
+                    <span>Google Gemini AI API Key (`gemini-3-flash` / `pro`)</span>
+                    <div className="admin-input-row">
+                      <input
+                        type="password"
+                        value={geminiKey}
+                        onChange={(e) => setGeminiKey(e.target.value)}
+                        placeholder="AIzaSy... (Paste Gemini API Key here)"
                       />
-                      <div>
-                        <strong>{site.name}</strong>
-                        <small>
-                          {site.url} · <em>{site.status}</em>
-                        </small>
-                      </div>
+                      <button
+                        type="button"
+                        className="clip-mini-btn"
+                        onClick={() =>
+                          copyToClipboard(
+                            geminiKey || 'AIzaSy-DemoKey',
+                            'Gemini API Key Copied to Clipboard!'
+                          )
+                        }
+                      >
+                        📋 Copy
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="clip-mini-btn"
-                      onClick={() =>
-                        copyToClipboard(site.url, `Copied ${site.name} URL!`)
-                      }
-                    >
-                      {site.clip}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </Tilt3DCard>
-          </div>
+                  </label>
 
-          {/* Admin Multi-Theme & Multi-Landing-Page Studio */}
-          <AdminPrincipalThemeStudio role="Admin" onPreviewLanding={onHome} />
+                  <label className="admin-field">
+                    <span>WhatsApp Parent Broadcast & SMS Gateway Webhook</span>
+                    <div className="admin-input-row">
+                      <input
+                        type="text"
+                        value={whatsappWebhook}
+                        onChange={(e) => setWhatsappWebhook(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="clip-mini-btn"
+                        onClick={() =>
+                          copyToClipboard(
+                            whatsappWebhook,
+                            'Webhook URL Copied to Clipboard!'
+                          )
+                        }
+                      >
+                        📋 Copy
+                      </button>
+                    </div>
+                  </label>
+
+                  <div className="admin-toggle-grid">
+                    {[
+                      ['geminiAi', 'Gemini AI Lesson & Exam Engine'],
+                      ['whatsappAlerts', 'WhatsApp Auto-Absent & Fee SMS'],
+                      ['biseDgKhanSync', 'BISE D.G. Khan Board Pattern Sync'],
+                      ['onlineFeeGateway', '1-Link / JazzCash / EasyPaisa Fee API'],
+                    ].map(([key, label]) => {
+                      const enabled =
+                        adminToggles[key as keyof typeof adminToggles];
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() =>
+                            setAdminToggles((prev) => ({
+                              ...prev,
+                              [key]: !prev[key as keyof typeof adminToggles],
+                            }))
+                          }
+                          className={`admin-switch-pill ${enabled ? 'on' : 'off'}`}
+                        >
+                          <span className="switch-dot" />
+                          <span>{label}</span>
+                          <strong>{enabled ? 'ON' : 'OFF'}</strong>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="admin-save-row">
+                    <LogoClipButton
+                      label="Save API Keys & Gateway Settings"
+                      clipText="📋 Save Config"
+                      variant="navy"
+                      useSchoolSeal
+                      onClick={saveAdminApiKey}
+                    />
+                  </div>
+                </div>
+              </Tilt3DCard>
+
+              <Tilt3DCard className="dashboard-card" intensity={4}>
+                <div className="card-heading">
+                  <div>
+                    <h2>🌐 External Websites & Portal Controls</h2>
+                    <p>Control connected websites, admissions & BISE D.G. Khan portals</p>
+                  </div>
+                  <span className="soft-badge">4 Websites Linked</span>
+                </div>
+
+                <div className="website-control-list">
+                  {[
+                    {
+                      name: 'Vision Grammar School Main Website',
+                      url: 'https://visiongrammarschool.edu.pk',
+                      status: 'Live · Admissions Open',
+                      clip: '📋 Copy Site',
+                    },
+                    {
+                      name: 'BISE D.G. Khan Board Enrolment Portal',
+                      url: 'https://bisedgkhan.edu.pk',
+                      status: 'Synced · 9th/10th Registration',
+                      clip: '🏛️ Board Link',
+                    },
+                    {
+                      name: 'Parent Online DMC & Fee Voucher Portal',
+                      url: 'https://portal.visiongrammarschool.edu.pk',
+                      status: 'Active · Instant DMC Lookup',
+                      clip: '📋 Copy Portal',
+                    },
+                    {
+                      name: 'Digital Textbook & PCTB Syllabus Cloud',
+                      url: 'https://pctb.punjab.gov.pk',
+                      status: 'Connected · Class 1–10 Books',
+                      clip: '📚 PCTB Link',
+                    },
+                  ].map((site) => (
+                    <div key={site.name} className="website-control-item">
+                      <div className="website-info">
+                        <img
+                          src="/vision-logo-crest.png"
+                          alt=""
+                          className="website-mini-seal"
+                        />
+                        <div>
+                          <strong>{site.name}</strong>
+                          <small>
+                            {site.url} · <em>{site.status}</em>
+                          </small>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="clip-mini-btn"
+                        onClick={() =>
+                          copyToClipboard(site.url, `Copied ${site.name} URL!`)
+                        }
+                      >
+                        {site.clip}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </Tilt3DCard>
+            </div>
+          )}
         </div>
       )}
 
       {/* =====================================================================
-          2. TEACHER DASHBOARD (Daily Classroom Workbench, Mawaad & Exam Maker)
+          2. TEACHER DASHBOARD (Clean Layout: Schedule, Drive Materials KG–10 & Live Reading OCR Tutor)
           ===================================================================== */}
       {role === 'Teacher' && (
         <div className="space-y-6">
           <section className="welcome-banner banner-teacher">
             <div>
               <span className="banner-kicker">
-                <BookOpen size={15} /> TEACHER WORKBENCH · DAILY MAWAAD · EXAM GENERATOR
+                <BookOpen size={15} /> TEACHER WORKBENCH · GOOGLE DRIVE MATERIALS · LIVE READING AI TUTOR
               </span>
               <h2>Assalam-o-Alaikum, Respected Teacher — Ready for Today’s Class!</h2>
               <p>
-                Select your class & subject below to view today’s 40-minute teaching script
-                (<em>Kitna, Kya, Kaise Parhana Hai</em>), generate board notes (Mawaad), or
-                build a Weekly / Monthly / Mid-Term / Annual Exam Paper in 1 click.
+                Access your clean daily schedule, Google Drive videos/worksheets (KG to Grade 10),
+                individual student Live Reading & Camera OCR Tutor, RFID/AI attendance, and
+                printable question papers + auto-ranked DMCs. All teacher entries are recorded in the Audit Log.
               </p>
               <div className="banner-btn-group">
                 <LogoClipButton
-                  label="Generate Today's Teacher Mawaad"
-                  sublabel="Board Layout + Word-for-Word Script"
-                  clipText="📋 Mawaad"
+                  label="Google Drive Materials (KG–10)"
+                  sublabel="Videos, Lesson Plans & PDF Worksheets"
+                  clipText="📁 Open Drive"
                   variant="gold"
                   useSchoolSeal
-                  onClick={() => openTool('system_agent')}
+                  onClick={() => setTeacherSubView('drive')}
                 />
                 <LogoClipButton
-                  label="Create Exam / Test Paper"
-                  sublabel="Weekly, Monthly, Mid-Term, Annual"
-                  clipText="📝 Exam AI"
+                  label="Live Reading & OCR AI Tutor"
+                  sublabel="Camera OCR + Voice + Noise Meter"
+                  clipText="🎙️ AI Tutor"
                   variant="white"
-                  icon={<FileText size={17} />}
-                  onClick={() => openTool('system_agent')}
+                  icon={<Mic size={17} />}
+                  onClick={() => setTeacherSubView('reading_tutor')}
                 />
                 <LogoClipButton
-                  label="Take Biometric Attendance"
-                  sublabel="1-Click Classroom Photo Scan"
+                  label="RFID & AI Photo Attendance"
+                  sublabel="Students & Staff Roll Call"
                   clipText="📸 Roll Call"
                   variant="navy"
                   icon={<Camera size={17} />}
@@ -1156,149 +1194,216 @@ export function Dashboard({
             </div>
           </section>
 
-          {/* Teacher's Live Today's Lesson & Mawaad Script Card */}
-          <Tilt3DCard className="dashboard-card teacher-chalkboard-card" intensity={4}>
-            <div className="card-heading">
-              <div>
-                <h2>📋 Today’s 40-Minute Classroom Teaching Plan (Beaconhouse / Allied Standard)</h2>
-                <p>
-                  Tells you exact pages (Kitna), core concept (Kya), and methodology with
-                  Saraiki/Urdu bridge (Kaise)
-                </p>
-              </div>
-              <div className="teacher-selectors">
-                <select
-                  value={teacherClass}
-                  onChange={(e) => setTeacherClass(e.target.value)}
+          {/* Clean Categorised Teacher Tool Switcher Bar */}
+          <div className="bg-white rounded-3xl border-2 border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {[
+                {
+                  id: 'overview',
+                  label: '📋 1. Today’s Schedule, Mawaad & Categorised Tools',
+                },
+                {
+                  id: 'drive',
+                  label: '📁 2. Google Drive Materials (KG–Grade 10) & AI Worksheets',
+                },
+                {
+                  id: 'reading_tutor',
+                  label: '🎙️ 3. Individual Student AI Tutor (Reading, Camera OCR & Noise Meter)',
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setTeacherSubView(tab.id as any)}
+                  className={`px-4 py-2.5 rounded-2xl text-xs font-extrabold transition-all ${
+                    teacherSubView === tab.id
+                      ? 'bg-blue-700 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
                 >
-                  <option value="8-A">Class 8-A</option>
-                  <option value="9-A">Class 9-A</option>
-                  <option value="10-A">Class 10-A</option>
-                </select>
-                <select
-                  value={teacherSubject}
-                  onChange={(e) => setTeacherSubject(e.target.value)}
-                >
-                  <option value="Mathematics">Mathematics</option>
-                  <option value="General Science">General Science (Ch: Light)</option>
-                  <option value="English">English Grammar & Translation</option>
-                  <option value="Urdu">Urdu (نثر و نظم)</option>
-                </select>
-              </div>
+                  {tab.label}
+                </button>
+              ))}
             </div>
-
-            <div className="teacher-plan-columns">
-              <div className="teacher-plan-box">
-                <span className="plan-pill">1. KITNA PARHANA HAI (TARGET)</span>
-                <h4>
-                  {teacherSubject === 'Mathematics'
-                    ? 'Chapter 2: Linear & Quadratic Equations (Pages 24–27, Ex 2.1 Q1–Q5)'
-                    : teacherSubject === 'General Science'
-                    ? 'Chapter: Light, Reflection & Refraction (Pages 68–71 + Ray Diagram)'
-                    : 'Unit 4: Past Indefinite & Continuous Tenses (Pages 32–35)'}
-                </h4>
-                <p>Complete 3 solved board examples + check 5 student notebooks in class.</p>
-              </div>
-
-              <div className="teacher-plan-box">
-                <span className="plan-pill gold">2. KYA PARHANA HAI (CONCEPT)</span>
-                <h4>Core Student Learning Outcome (SLO)</h4>
-                <p>
-                  Students will understand the step-by-step logic instead of rote
-                  memorization (Ratta) and solve 3 BISE D.G. Khan board-pattern questions
-                  independently.
-                </p>
-              </div>
-
-              <div className="teacher-plan-box">
-                <span className="plan-pill emerald">3. KAISE PARHANA HAI + MOTHER-TONGUE BRIDGE</span>
-                <h4>10m Warm-up · 20m Board Explanation · 10m Oral Check</h4>
-                <p>
-                  Explain the core rule in Urdu & English, then connect it with a local
-                  D.G. Khan / Saraiki everyday life analogy so every student grasps it.
-                </p>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('attendance')}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold"
+              >
+                🪪 RFID / AI Attendance →
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('records')}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold"
+              >
+                📝 Exam Papers, AI Check & DMCs →
+              </button>
             </div>
-
-            <div className="teacher-plan-actions">
-              <LogoClipButton
-                label={`Copy ${teacherClass} ${teacherSubject} Board Script`}
-                clipText="📋 Copy Script"
-                variant="navy"
-                icon={<Copy size={16} />}
-                onClick={() =>
-                  copyToClipboard(
-                    `Vision Grammar School (${teacherClass} - ${teacherSubject}): Kitna/Kya/Kaise Parhana Hai script ready.`,
-                    'Copied Today’s Teacher Script to Clipboard!'
-                  )
-                }
-              />
-              <LogoClipButton
-                label="Open Full 24-Day Monthly Planner"
-                clipText="🗓️ 24-Day Plan"
-                variant="gold"
-                useSchoolSeal
-                onClick={() => openTool('system_agent')}
-              />
-            </div>
-          </Tilt3DCard>
-
-          {/* Teacher's 6 Specialized Workbench Tools with Mini Logos & Clipboards */}
-          <div className="section-heading">
-            <h2>👩‍🏫 Teacher’s 6 Classroom AI Tools (With Mini Logos & Clipboards)</h2>
-            <span>Everything a teacher needs in one place</span>
           </div>
 
-          <div className="quick-grid">
-            <LogoClipButton
-              label="24-Day Monthly Syllabus Planner"
-              sublabel="Date-wise & day-wise plan for your book"
-              clipText="🗓️ Planner"
-              variant="navy"
-              useSchoolSeal
-              onClick={() => openTool('system_agent')}
+          {teacherSubView === 'drive' && (
+            <DriveMaterialsHub actorName="Ustad Ahmed Raza" actorRole="TEACHER" />
+          )}
+
+          {teacherSubView === 'reading_tutor' && (
+            <LiveReadingAiTutor
+              students={students}
+              actorName="Ustad Ahmed Raza"
+              actorRole="TEACHER"
             />
-            <LogoClipButton
-              label="Weekly / Monthly / Annual Exam Maker"
-              sublabel="Section A (MCQs), B (Short), C (Long) + Key"
-              clipText="📝 Exam AI"
-              variant="gold"
-              icon={<FileText size={18} />}
-              onClick={() => openTool('system_agent')}
-            />
-            <LogoClipButton
-              label="Lesson Plan & Multigrade Split"
-              sublabel="Single-teacher 2-group classroom routine"
-              clipText="📋 Lesson"
-              variant="emerald"
-              icon={<Layers size={18} />}
-              onClick={() => openTool('hub')}
-            />
-            <LogoClipButton
-              label="Grade Handwritten Homework"
-              sublabel="Camera Math step-checker & Urdu/English"
-              clipText="📸 Grader"
-              variant="indigo"
-              icon={<Camera size={18} />}
-              onClick={() => openTool('assessment')}
-            />
-            <LogoClipButton
-              label="Harvest & Flood Catch-Up Pack"
-              sublabel="15-min study sheet + WhatsApp to parent"
-              clipText="🌾 Catch-Up"
-              variant="navy"
-              icon={<Compass size={18} />}
-              onClick={() => openTool('catchup')}
-            />
-            <LogoClipButton
-              label="Enter Student Exam Marks (DMC)"
-              sublabel="Record Weekly, Mid-Term & Annual scores"
-              clipText="🏅 Marks"
-              variant="gold"
-              useSchoolSeal
-              onClick={() => navigate('records')}
-            />
-          </div>
+          )}
+
+          {teacherSubView === 'overview' && (
+            <>
+              {/* Teacher's Live Today's Lesson & Mawaad Script Card */}
+              <Tilt3DCard className="dashboard-card teacher-chalkboard-card" intensity={4}>
+                <div className="card-heading">
+                  <div>
+                    <h2>📋 Today’s 40-Minute Classroom Teaching Plan (Beaconhouse / Allied Standard)</h2>
+                    <p>
+                      Tells you exact pages (Kitna), core concept (Kya), and methodology with
+                      Saraiki/Urdu bridge (Kaise)
+                    </p>
+                  </div>
+                  <div className="teacher-selectors">
+                    <select
+                      value={teacherClass}
+                      onChange={(e) => setTeacherClass(e.target.value)}
+                    >
+                      <option value="KG">Class KG</option>
+                      <option value="5-A">Class 5-A</option>
+                      <option value="8-A">Class 8-A</option>
+                      <option value="9-A">Class 9-A</option>
+                      <option value="10-A">Class 10-A</option>
+                    </select>
+                    <select
+                      value={teacherSubject}
+                      onChange={(e) => setTeacherSubject(e.target.value)}
+                    >
+                      <option value="Mathematics">Mathematics</option>
+                      <option value="General Science">General Science (Ch: Light)</option>
+                      <option value="English">English Grammar & Translation</option>
+                      <option value="Urdu">Urdu (نثر و نظم)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="teacher-plan-columns">
+                  <div className="teacher-plan-box">
+                    <span className="plan-pill">1. KITNA PARHANA HAI (TARGET)</span>
+                    <h4>
+                      {teacherSubject === 'Mathematics'
+                        ? 'Chapter 2: Linear & Quadratic Equations (Pages 24–27, Ex 2.1 Q1–Q5)'
+                        : teacherSubject === 'General Science'
+                        ? 'Chapter: Light, Reflection & Refraction (Pages 68–71 + Ray Diagram)'
+                        : 'Unit 4: Past Indefinite & Continuous Tenses (Pages 32–35)'}
+                    </h4>
+                    <p>Complete 3 solved board examples + check 5 student notebooks in class.</p>
+                  </div>
+
+                  <div className="teacher-plan-box">
+                    <span className="plan-pill gold">2. KYA PARHANA HAI (CONCEPT)</span>
+                    <h4>Core Student Learning Outcome (SLO)</h4>
+                    <p>
+                      Students will understand the step-by-step logic instead of rote
+                      memorization (Ratta) and solve 3 BISE D.G. Khan board-pattern questions
+                      independently.
+                    </p>
+                  </div>
+
+                  <div className="teacher-plan-box">
+                    <span className="plan-pill emerald">3. KAISE PARHANA HAI + MOTHER-TONGUE BRIDGE</span>
+                    <h4>10m Warm-up · 20m Board Explanation · 10m Oral Check</h4>
+                    <p>
+                      Explain the core rule in Urdu & English, then connect it with a local
+                      D.G. Khan / Saraiki everyday life analogy so every student grasps it.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="teacher-plan-actions">
+                  <LogoClipButton
+                    label={`Copy ${teacherClass} ${teacherSubject} Board Script`}
+                    clipText="📋 Copy Script"
+                    variant="navy"
+                    icon={<Copy size={16} />}
+                    onClick={() =>
+                      copyToClipboard(
+                        `Vision Grammar School (${teacherClass} - ${teacherSubject}): Kitna/Kya/Kaise Parhana Hai script ready.`,
+                        'Copied Today’s Teacher Script to Clipboard!'
+                      )
+                    }
+                  />
+                  <LogoClipButton
+                    label="Open Google Drive Materials (KG–10)"
+                    clipText="📁 Drive Hub"
+                    variant="gold"
+                    useSchoolSeal
+                    onClick={() => setTeacherSubView('drive')}
+                  />
+                </div>
+              </Tilt3DCard>
+
+              {/* Categorised Teacher Tools & Sub-Tools Grid */}
+              <div className="section-heading">
+                <h2>👩‍🏫 Categorised Classroom Tools & Sub-Tools</h2>
+                <span>Clean, single-click access to every teaching, assessment & exam function</span>
+              </div>
+
+              <div className="quick-grid">
+                <LogoClipButton
+                  label="Google Drive Learning Materials"
+                  sublabel="KG–10 Videos, Lesson Plans & PDFs"
+                  clipText="📁 Drive Hub"
+                  variant="navy"
+                  useSchoolSeal
+                  onClick={() => setTeacherSubView('drive')}
+                />
+                <LogoClipButton
+                  label="Live Reading & OCR AI Tutor"
+                  sublabel="Camera OCR + Voice + Noise Meter"
+                  clipText="🎙️ Reading AI"
+                  variant="gold"
+                  icon={<Mic size={18} />}
+                  onClick={() => setTeacherSubView('reading_tutor')}
+                />
+                <LogoClipButton
+                  label="Question Papers & AI Sheet Check"
+                  sublabel="Prepare & Print Papers + Auto-Rank DMCs"
+                  clipText="📝 Exam Suite"
+                  variant="emerald"
+                  icon={<FileText size={18} />}
+                  onClick={() => navigate('records')}
+                />
+                <LogoClipButton
+                  label="RFID & AI Photo Attendance"
+                  sublabel="Students & Teachers/Staff Roll-Call"
+                  clipText="🪪 Attendance"
+                  variant="indigo"
+                  icon={<Camera size={18} />}
+                  onClick={() => navigate('attendance')}
+                />
+                <LogoClipButton
+                  label="24-Day Monthly Syllabus Planner"
+                  sublabel="Date-wise & day-wise plan for your book"
+                  clipText="🗓️ Planner"
+                  variant="navy"
+                  icon={<Compass size={18} />}
+                  onClick={() => openTool('system_agent')}
+                />
+                <LogoClipButton
+                  label="Lesson Plan & Multigrade Split"
+                  sublabel="Single-teacher 2-group classroom routine"
+                  clipText="📋 Lesson"
+                  variant="gold"
+                  useSchoolSeal
+                  onClick={() => openTool('hub')}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1729,37 +1834,45 @@ export function Dashboard({
       )}
 
       {/* =====================================================================
-          5. PRINCIPAL DASHBOARD (Executive Academic Audit & Merit Command)
+          5. PRINCIPAL DASHBOARD (Executive Academic Audit, Attendance, Finance, RBAC & AI CLIs)
           ===================================================================== */}
       {role === 'Principal' && (
         <div className="space-y-6">
           <section className="welcome-banner banner-principal">
             <div>
               <span className="banner-kicker">
-                <Award size={15} /> PRINCIPAL EXECUTIVE AUDIT · SYLLABUS & MERIT COMMAND
+                <Award size={15} /> PRINCIPAL EXECUTIVE AUDIT · PERFORMANCE · ATTENDANCE · FINANCE · RBAC
               </span>
-              <h2>Academic Quality & 24-Day Syllabus Audit — Vision Grammar School</h2>
+              <h2>Principal Executive Command — Vision Grammar School</h2>
               <p>
-                Monitor teacher syllabus completion across all classes, verify daily
-                teacher mawaad delivery, and review top merit scholars (`Akhtar Ali #56432`,
-                `Maria Bibi #563`).
+                Monitor staff & student attendance ratios, course completion rates, student
+                performance charts, today’s income & expense ledger, teacher task assignments,
+                audit logs, access permissions (RBAC), and all teacher-level tools.
               </p>
               <div className="banner-btn-group">
                 <LogoClipButton
-                  label="Audit 24-Day Monthly Plans"
-                  sublabel="Verify daily teacher mawaad completion"
-                  clipText="🗓️ Audit Plan"
+                  label="RFID & AI Photo Attendance"
+                  sublabel="Students + Staff Gate Live"
+                  clipText="🪪 Attendance"
                   variant="gold"
                   useSchoolSeal
-                  onClick={() => openTool('system_agent')}
+                  onClick={() => navigate('attendance')}
                 />
                 <LogoClipButton
-                  label="Review All DMC Results"
-                  sublabel="Approve Principal remarks & positions"
+                  label="Exams, AI Sheet Check & DMCs"
+                  sublabel="Approve Class/School Positions & Print"
                   clipText="🏆 DMC List"
                   variant="white"
                   icon={<Award size={17} />}
                   onClick={() => navigate('records')}
+                />
+                <LogoClipButton
+                  label="Audit 24-Day Monthly Plans"
+                  sublabel="Verify daily teacher mawaad completion"
+                  clipText="🗓️ Audit Plan"
+                  variant="navy"
+                  icon={<CalendarCheck size={17} />}
+                  onClick={() => openTool('system_agent')}
                 />
               </div>
             </div>
@@ -1778,118 +1891,137 @@ export function Dashboard({
             </div>
           </section>
 
-          <div className="metric-grid">
-            <Tilt3DCard className="metric-card" intensity={10}>
-              <div className="metric-top">
-                <span>24-Day Syllabus Completion</span>
-                <span className="metric-icon mint">
-                  <CalendarCheck size={19} />
-                </span>
-              </div>
-              <strong>92% On Track</strong>
-              <small>22 of 24 daily mawaad units delivered</small>
-            </Tilt3DCard>
-
-            <Tilt3DCard className="metric-card" intensity={10}>
-              <div className="metric-top">
-                <span>School Exam Average</span>
-                <span className="metric-icon blue">
-                  <ChartColumn size={19} />
-                </span>
-              </div>
-              <strong>{avgExamScore.toFixed(1)}%</strong>
-              <small>Across Mid-Term & Annual DMCs</small>
-            </Tilt3DCard>
-
-            <Tilt3DCard className="metric-card" intensity={10}>
-              <div className="metric-top">
-                <span>A+ Merit Scholars</span>
-                <span className="metric-icon purple">
-                  <Award size={19} />
-                </span>
-              </div>
-              <strong>{exams.filter((e) => e.overallGrade === 'A+').length} Students</strong>
-              <small>Led by Maria Bibi (90.5%) & Akhtar Ali (88.8%)</small>
-            </Tilt3DCard>
-
-            <Tilt3DCard className="metric-card" intensity={10}>
-              <div className="metric-top">
-                <span>Weekly & Monthly Tests Held</span>
-                <span className="metric-icon peach">
-                  <ClipboardCheck size={19} />
-                </span>
-              </div>
-              <strong>100% Held</strong>
-              <small>Days 6, 12, 18 & 24 checkpoints verified</small>
-            </Tilt3DCard>
+          {/* Clean Categorised Principal Tool Navigation Bar */}
+          <div className="bg-white rounded-3xl border-2 border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {[
+                {
+                  id: 'executive',
+                  label: '📊 1. Executive Insights, Attendance, Finance, Tasks & Audit Log',
+                },
+                {
+                  id: 'rbac',
+                  label: '🔐 2. Access Management (RBAC Profiles & Users)',
+                },
+                {
+                  id: 'ai_cli',
+                  label: '🤖 3. AI Agents & Subscription CLIs (Codex / Claude / anti-api)',
+                },
+                {
+                  id: 'theme_cms',
+                  label: '🎨 4. Website Theme & Landing Page CMS',
+                },
+                {
+                  id: 'teacher_tools',
+                  label: '👩‍🏫 5. All Teacher Tools (Drive KG–10, Reading OCR Tutor & Syllabus)',
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAdminSubView(tab.id as any)}
+                  className={`px-3.5 py-2.5 rounded-2xl text-xs font-extrabold transition-all ${
+                    adminSubView === tab.id
+                      ? 'bg-blue-700 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <Tilt3DCard className="dashboard-card" intensity={4}>
-            <div className="card-heading">
-              <div>
-                <h2>🏛️ Teacher 24-Day Syllabus & Daily Mawaad Audit Table</h2>
-                <p>Principal verification of Beaconhouse/Allied-standard monthly plans</p>
-              </div>
-              <LogoClipButton
-                label="Open Full Syllabus Planner"
-                clipText="📋 Inspect"
-                variant="navy"
-                useSchoolSeal
-                onClick={() => openTool('system_agent')}
+          {adminSubView === 'executive' && (
+            <PrincipalExecutiveAnalytics
+              students={students}
+              attendanceData={attendance}
+              examRecords={exams}
+            />
+          )}
+
+          {adminSubView === 'rbac' && <AccessManagementSuite />}
+
+          {adminSubView === 'ai_cli' && <AiAgentsAndCliHub />}
+
+          {adminSubView === 'theme_cms' && (
+            <AdminPrincipalThemeStudio role="Principal" onPreviewLanding={onHome} />
+          )}
+
+          {adminSubView === 'teacher_tools' && (
+            <div className="space-y-6">
+              <Tilt3DCard className="dashboard-card" intensity={4}>
+                <div className="card-heading">
+                  <div>
+                    <h2>🏛️ Teacher 24-Day Syllabus & Daily Mawaad Audit Table</h2>
+                    <p>Principal verification of Beaconhouse/Allied-standard monthly plans</p>
+                  </div>
+                  <LogoClipButton
+                    label="Open Full Syllabus Planner"
+                    clipText="📋 Inspect"
+                    variant="navy"
+                    useSchoolSeal
+                    onClick={() => openTool('system_agent')}
+                  />
+                </div>
+                <div className="table-scroll">
+                  <table className="modern-table">
+                    <thead>
+                      <tr>
+                        <th>Class & Subject</th>
+                        <th>Course Portion</th>
+                        <th>Days Completed</th>
+                        <th>Weekly Tests</th>
+                        <th>Audit Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <strong>Class 8-A · Mathematics</strong>
+                        </td>
+                        <td>Half Course (Ch 1 to 10)</td>
+                        <td>22 / 24 Days</td>
+                        <td>3 / 3 Completed</td>
+                        <td>
+                          <span className="grade-badge">Verified ✓</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>Class 8-A · General Science</strong>
+                        </td>
+                        <td>Ch: Light, Reflection & Optics</td>
+                        <td>21 / 24 Days</td>
+                        <td>3 / 3 Completed</td>
+                        <td>
+                          <span className="grade-badge">Verified ✓</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>Class 9-A · Biology (BISE DGK)</strong>
+                        </td>
+                        <td>Photosynthesis & Cell Bio (Ch 4–7)</td>
+                        <td>23 / 24 Days</td>
+                        <td>3 / 3 Completed</td>
+                        <td>
+                          <span className="grade-badge">Verified ✓</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Tilt3DCard>
+
+              <DriveMaterialsHub actorName="Principal" actorRole="ADMIN" />
+              <LiveReadingAiTutor
+                students={students}
+                actorName="Principal"
+                actorRole="ADMIN"
               />
             </div>
-            <div className="table-scroll">
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th>Class & Subject</th>
-                    <th>Course Portion</th>
-                    <th>Days Completed</th>
-                    <th>Weekly Tests</th>
-                    <th>Audit Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>
-                      <strong>Class 8-A · Mathematics</strong>
-                    </td>
-                    <td>Half Course (Ch 1 to 10)</td>
-                    <td>22 / 24 Days</td>
-                    <td>3 / 3 Completed</td>
-                    <td>
-                      <span className="grade-badge">Verified ✓</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>Class 8-A · General Science</strong>
-                    </td>
-                    <td>Ch: Light, Reflection & Optics</td>
-                    <td>21 / 24 Days</td>
-                    <td>3 / 3 Completed</td>
-                    <td>
-                      <span className="grade-badge">Verified ✓</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <strong>Class 9-A · Biology (BISE DGK)</strong>
-                    </td>
-                    <td>Photosynthesis & Cell Bio (Ch 4–7)</td>
-                    <td>23 / 24 Days</td>
-                    <td>3 / 3 Completed</td>
-                    <td>
-                      <span className="grade-badge">Verified ✓</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </Tilt3DCard>
-
-          {/* Principal Multi-Theme & Multi-Landing-Page Studio */}
-          <AdminPrincipalThemeStudio role="Principal" onPreviewLanding={onHome} />
+          )}
         </div>
       )}
     </div>

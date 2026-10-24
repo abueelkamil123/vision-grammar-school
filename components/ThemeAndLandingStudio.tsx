@@ -311,6 +311,17 @@ export const AdminPrincipalThemeStudio: React.FC<{
 }> = ({ role, onPreviewLanding }) => {
   const { config, updateConfig } = useThemeStudioConfig();
   const [savedBanner, setSavedBanner] = useState<string>('');
+  const [newPromoBadge, setNewPromoBadge] = useState<string>('NEW ANNOUNCEMENT');
+  const [newPromoTitle, setNewPromoTitle] = useState<string>('');
+  const [newPromoSubtitle, setNewPromoSubtitle] = useState<string>('');
+  const [newNewsItem, setNewNewsItem] = useState<string>('');
+  const [newUpdateTitle, setNewUpdateTitle] = useState<string>('');
+  const [newUpdateSummary, setNewUpdateSummary] = useState<string>('');
+  const [newEventTitle, setNewEventTitle] = useState<string>('');
+  const [newEventDate, setNewEventDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [newEventVenue, setNewEventVenue] = useState<string>('Main Campus Block 56');
 
   const notifySaved = (msg: string) => {
     setSavedBanner(msg);
@@ -809,6 +820,334 @@ export const AdminPrincipalThemeStudio: React.FC<{
           })}
         </div>
       </div>
+
+      {/* 4. MANAGE PROMOTIONAL BANNERS, SCROLLING NEWS, RECENT UPDATES & UPCOMING EVENTS */}
+      <div
+        className="p-5 rounded-2xl border-2 space-y-6"
+        style={{
+          background: 'var(--surface-subtle)',
+          borderColor: 'var(--card-border)',
+        }}
+      >
+        <div>
+          <h3
+            className="text-base md:text-lg font-extrabold flex items-center gap-2"
+            style={{ color: 'var(--ink)' }}
+          >
+            <BellRing className="w-5 h-5" style={{ color: 'var(--navy)' }} />
+            4. Public Landing Page CMS: Promotional Banners, Scrolling News, Recent Updates & Upcoming Events
+          </h3>
+          <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--muted)' }}>
+            Add or remove promotional banners, scrolling ticker news, recent updates, and upcoming school events shown on the public website.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 text-xs">
+          {/* A. Promotional Banners */}
+          <div
+            className="p-4 rounded-2xl border space-y-3"
+            style={{ background: 'var(--card)', borderColor: 'var(--card-border)' }}
+          >
+            <div className="font-extrabold uppercase" style={{ color: 'var(--navy)' }}>
+              🎯 Promotional Banners ({(config.promoBanners || []).length})
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="text"
+                value={newPromoBadge}
+                onChange={(e) => setNewPromoBadge(e.target.value)}
+                placeholder="Badge (e.g. ADMISSIONS)"
+                className="px-3 py-2 rounded-xl border font-bold"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+              <input
+                type="text"
+                value={newPromoTitle}
+                onChange={(e) => setNewPromoTitle(e.target.value)}
+                placeholder="Banner Headline..."
+                className="sm:col-span-2 px-3 py-2 rounded-xl border font-bold"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newPromoSubtitle}
+                onChange={(e) => setNewPromoSubtitle(e.target.value)}
+                placeholder="Subtitle / details..."
+                className="flex-1 px-3 py-2 rounded-xl border"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newPromoTitle.trim()) return;
+                  const next = [
+                    {
+                      id: `promo-${Date.now()}`,
+                      badge: newPromoBadge || 'NOTICE',
+                      title: newPromoTitle.trim(),
+                      subtitle: newPromoSubtitle.trim(),
+                      ctaText: 'Apply Now',
+                      active: true,
+                    },
+                    ...(config.promoBanners || []),
+                  ];
+                  updateConfig({ promoBanners: next, updatedByRole: role });
+                  setNewPromoTitle('');
+                  setNewPromoSubtitle('');
+                  notifySaved('Added new Promotional Banner to Public Landing Page');
+                }}
+                className="vgs-btn-3d vgs-btn-3d-primary !py-2 !px-3.5"
+              >
+                + Add Banner
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              {(config.promoBanners || []).map((b) => (
+                <div
+                  key={b.id}
+                  className="p-2.5 rounded-xl border flex items-center justify-between gap-2"
+                  style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+                >
+                  <div>
+                    <span className="font-extrabold text-amber-600">[{b.badge}]</span>{' '}
+                    <strong>{b.title}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateConfig({
+                        promoBanners: (config.promoBanners || []).filter((x) => x.id !== b.id),
+                      })
+                    }
+                    className="text-rose-600 font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* B. Scrolling News Ticker */}
+          <div
+            className="p-4 rounded-2xl border space-y-3"
+            style={{ background: 'var(--card)', borderColor: 'var(--card-border)' }}
+          >
+            <div className="font-extrabold uppercase" style={{ color: 'var(--navy)' }}>
+              📢 Scrolling News Ticker ({(config.scrollingNews || []).length})
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newNewsItem}
+                onChange={(e) => setNewNewsItem(e.target.value)}
+                placeholder="Type scrolling news ticker announcement..."
+                className="flex-1 px-3 py-2 rounded-xl border font-bold"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newNewsItem.trim()) return;
+                  updateConfig({
+                    scrollingNews: [newNewsItem.trim(), ...(config.scrollingNews || [])],
+                    updatedByRole: role,
+                  });
+                  setNewNewsItem('');
+                  notifySaved('Added item to Public Scrolling News Ticker');
+                }}
+                className="vgs-btn-3d vgs-btn-3d-primary !py-2 !px-3.5"
+              >
+                + Add News
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+              {(config.scrollingNews || []).map((news, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-xl border flex items-center justify-between gap-2"
+                  style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+                >
+                  <span className="truncate">{news}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateConfig({
+                        scrollingNews: (config.scrollingNews || []).filter((_, i) => i !== idx),
+                      })
+                    }
+                    className="text-rose-600 font-bold shrink-0"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* C. Recent School Updates */}
+          <div
+            className="p-4 rounded-2xl border space-y-3"
+            style={{ background: 'var(--card)', borderColor: 'var(--card-border)' }}
+          >
+            <div className="font-extrabold uppercase" style={{ color: 'var(--navy)' }}>
+              📰 Recent Updates ({(config.recentUpdates || []).length})
+            </div>
+            <input
+              type="text"
+              value={newUpdateTitle}
+              onChange={(e) => setNewUpdateTitle(e.target.value)}
+              placeholder="Update headline..."
+              className="w-full px-3 py-2 rounded-xl border font-bold"
+              style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newUpdateSummary}
+                onChange={(e) => setNewUpdateSummary(e.target.value)}
+                placeholder="Brief update summary..."
+                className="flex-1 px-3 py-2 rounded-xl border"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newUpdateTitle.trim()) return;
+                  updateConfig({
+                    recentUpdates: [
+                      {
+                        id: `upd-${Date.now()}`,
+                        date: new Date().toISOString().split('T')[0],
+                        title: newUpdateTitle.trim(),
+                        summary: newUpdateSummary.trim(),
+                      },
+                      ...(config.recentUpdates || []),
+                    ],
+                  });
+                  setNewUpdateTitle('');
+                  setNewUpdateSummary('');
+                  notifySaved('Added Recent Update to Public Landing Page');
+                }}
+                className="vgs-btn-3d vgs-btn-3d-primary !py-2 !px-3.5"
+              >
+                + Add Update
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              {(config.recentUpdates || []).map((u) => (
+                <div
+                  key={u.id}
+                  className="p-2.5 rounded-xl border flex items-center justify-between gap-2"
+                  style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+                >
+                  <div>
+                    <strong>{u.title}</strong> ({u.date})
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateConfig({
+                        recentUpdates: (config.recentUpdates || []).filter((x) => x.id !== u.id),
+                      })
+                    }
+                    className="text-rose-600 font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* D. Upcoming School Events */}
+          <div
+            className="p-4 rounded-2xl border space-y-3"
+            style={{ background: 'var(--card)', borderColor: 'var(--card-border)' }}
+          >
+            <div className="font-extrabold uppercase" style={{ color: 'var(--navy)' }}>
+              📅 Upcoming Events ({(config.upcomingEvents || []).length})
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                type="date"
+                value={newEventDate}
+                onChange={(e) => setNewEventDate(e.target.value)}
+                className="px-3 py-2 rounded-xl border font-bold"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+              <input
+                type="text"
+                value={newEventTitle}
+                onChange={(e) => setNewEventTitle(e.target.value)}
+                placeholder="Event Title..."
+                className="sm:col-span-2 px-3 py-2 rounded-xl border font-bold"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newEventVenue}
+                onChange={(e) => setNewEventVenue(e.target.value)}
+                placeholder="Venue..."
+                className="flex-1 px-3 py-2 rounded-xl border"
+                style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newEventTitle.trim()) return;
+                  updateConfig({
+                    upcomingEvents: [
+                      {
+                        id: `evt-${Date.now()}`,
+                        date: newEventDate,
+                        title: newEventTitle.trim(),
+                        venue: newEventVenue.trim(),
+                      },
+                      ...(config.upcomingEvents || []),
+                    ],
+                  });
+                  setNewEventTitle('');
+                  notifySaved('Added Upcoming Event to Public Landing Page');
+                }}
+                className="vgs-btn-3d vgs-btn-3d-primary !py-2 !px-3.5"
+              >
+                + Add Event
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              {(config.upcomingEvents || []).map((ev) => (
+                <div
+                  key={ev.id}
+                  className="p-2.5 rounded-xl border flex items-center justify-between gap-2"
+                  style={{ background: 'var(--surface-subtle)', borderColor: 'var(--card-border)', color: 'var(--ink)' }}
+                >
+                  <div>
+                    <strong>{ev.title}</strong> • {ev.date} ({ev.venue})
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateConfig({
+                        upcomingEvents: (config.upcomingEvents || []).filter(
+                          (x) => x.id !== ev.id
+                        ),
+                      })
+                    }
+                    className="text-rose-600 font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </motion.section>
   );
 };
@@ -1296,6 +1635,30 @@ export const DynamicMultiLandingPage: React.FC<{
           </div>
         </div>
       </header>
+
+      {/* LIVE SCROLLING NEWS TICKER BAR (Managed by Admin/Principal) */}
+      {(config.scrollingNews || []).length > 0 && (
+        <div
+          className="w-full px-4 sm:px-8 lg:px-12 py-2.5 border-b text-xs font-extrabold flex items-center gap-3 overflow-x-auto whitespace-nowrap"
+          style={{
+            background: 'var(--surface-subtle)',
+            borderColor: 'var(--card-border)',
+            color: 'var(--ink)',
+          }}
+        >
+          <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black uppercase text-[10px] shrink-0">
+            LIVE NEWS
+          </span>
+          <div className="flex items-center gap-8">
+            {(config.scrollingNews || []).map((news, idx) => (
+              <span key={idx} className="inline-flex items-center gap-2">
+                <span>{news}</span>
+                <span className="opacity-40">•</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* FULL-SCREEN MAIN PUBLIC SCHOOL WEBSITE CONTENT */}
       <main className="w-full px-4 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-14">
@@ -2175,6 +2538,129 @@ export const DynamicMultiLandingPage: React.FC<{
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </section>
+
+        {/* ===============================================================
+            PROMOTIONAL BANNERS, RECENT UPDATES & UPCOMING EVENTS SECTION
+            (Managed by Admin / Principal from Theme & Landing CMS)
+            =============================================================== */}
+        <section className="space-y-8">
+          {(config.promoBanners || []).length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {(config.promoBanners || []).map((banner) => (
+                <Interactive3DTiltCard
+                  key={banner.id}
+                  accent="gold"
+                  className="p-6 flex flex-col justify-between gap-4"
+                >
+                  <div>
+                    <span className="eyebrow">{banner.badge}</span>
+                    <h3
+                      className="text-xl font-extrabold mt-2"
+                      style={{ color: 'var(--ink)' }}
+                    >
+                      {banner.title}
+                    </h3>
+                    <p
+                      className="text-sm font-medium mt-1"
+                      style={{ color: 'var(--muted)' }}
+                    >
+                      {banner.subtitle}
+                    </p>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection('public-admissions')}
+                      className="vgs-btn-3d vgs-btn-3d-gold !py-2 !px-4 !text-xs"
+                    >
+                      {banner.ctaText || 'Learn More'}
+                    </button>
+                  </div>
+                </Interactive3DTiltCard>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Recent School Updates */}
+            <div className="vgs-card-3d vgs-accent-cyan p-6 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <BellRing className="w-5 h-5" style={{ color: 'var(--navy)' }} />
+                <h3
+                  className="text-lg font-extrabold"
+                  style={{ color: 'var(--ink)' }}
+                >
+                  Recent Campus Updates & Announcements
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {(config.recentUpdates || []).map((upd) => (
+                  <div
+                    key={upd.id}
+                    className="p-4 rounded-2xl border space-y-1"
+                    style={{
+                      background: 'var(--surface-subtle)',
+                      borderColor: 'var(--card-border)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <strong style={{ color: 'var(--ink)' }}>{upd.title}</strong>
+                      <span
+                        className="font-mono font-bold"
+                        style={{ color: 'var(--gold-dark)' }}
+                      >
+                        {upd.date}
+                      </span>
+                    </div>
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                      {upd.summary}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Upcoming School Events */}
+            <div className="vgs-card-3d vgs-accent-emerald p-6 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <Calendar className="w-5 h-5 text-emerald-500" />
+                <h3
+                  className="text-lg font-extrabold"
+                  style={{ color: 'var(--ink)' }}
+                >
+                  Upcoming School Events Calendar
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {(config.upcomingEvents || []).map((evt) => (
+                  <div
+                    key={evt.id}
+                    className="p-4 rounded-2xl border flex items-center justify-between gap-3"
+                    style={{
+                      background: 'var(--surface-subtle)',
+                      borderColor: 'var(--card-border)',
+                    }}
+                  >
+                    <div>
+                      <div
+                        className="text-sm font-extrabold"
+                        style={{ color: 'var(--ink)' }}
+                      >
+                        {evt.title}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--muted)' }}>
+                        📍 {evt.venue}
+                      </div>
+                    </div>
+                    <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-500 font-mono font-extrabold text-xs shrink-0">
+                      {evt.date}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
